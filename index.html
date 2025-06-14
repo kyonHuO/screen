@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>製品比較ツール</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f4f4f4; }
+    h1 { margin-bottom: 1rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; background: white; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    input[type="text"] { width: 100%; box-sizing: border-box; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>製品比較ツール（テレビ）</h1>
+  <div id="table-container">読み込み中...</div>
+  <button id="save-btn">編集結果をCSVで保存</button>
+
+  <script>
+    let data = [];
+    const editableFields = [];
+
+    function createTable(dataArray) {
+      const headers = Object.keys(dataArray[0]);
+      editableFields.push(...headers);
+
+      const table = document.createElement("table");
+      const thead = table.createTHead();
+      const headRow = thead.insertRow();
+      headers.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        headRow.appendChild(th);
+      });
+
+      const tbody = table.createTBody();
+      dataArray.forEach((item, rowIndex) => {
+        const row = tbody.insertRow();
+        headers.forEach(field => {
+          const cell = row.insertCell();
+          const input = document.createElement("input");
+          input.type = "text";
+          input.value = item[field] || "";
+          input.addEventListener("input", (e) => {
+            data[rowIndex][field] = e.target.value;
+            localStorage.setItem("tv-data-edited", JSON.stringify(data));
+          });
+          cell.appendChild(input);
+        });
+      });
+
+      const container = document.getElementById("table-container");
+      container.innerHTML = "";
+      container.appendChild(table);
+    }
+
+    function downloadCSV(dataArray) {
+      const headers = Object.keys(dataArray[0]);
+      const csvContent = [
+        headers.join(','),
+        ...dataArray.map(row => headers.map(h => `"${(row[h] || '').replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `tv-data-edited-${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    document.getElementById("save-btn").addEventListener("click", () => {
+      downloadCSV(data);
+    });
+
+    fetch("tv-data.json")
+      .then(res => res.json())
+      .then(json => {
+        const saved = localStorage.getItem("tv-data-edited");
+        data = saved ? JSON.parse(saved) : json;
+        createTable(data);
+      });
+  </script>
+</body>
+</html>
