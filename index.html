@@ -13,17 +13,19 @@
     body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
     .card{background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.08);transition:.3s;cursor:pointer}
     .card:hover{transform:translateY(-5px);box-shadow:0 10px 25px rgba(0,0,0,.1)}
-    .btn{border-radius:8px;font-weight:500;transition:.2s}
+    .btn{border-radius:8px;font-weight:600;transition:.2s;padding:0.6rem 0.85rem;font-size:0.8rem}
     .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
     .btn-secondary{background:#6b7280;color:#fff}.btn-secondary:hover{background:#4b5563}
     .btn-tertiary{background:#10b981;color:#fff}.btn-tertiary:hover{background:#059669}
     .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
     ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#a8a8a8;border-radius:4px}
+    @keyframes fade-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+    .animate-fade-in{animation:fade-in .15s ease-out}
   </style>
 </head>
-<body class="antialiased text-gray-800">
+<body class="antialiased text-gray-800 select-none">
   <!-- ヘッダー -->
-  <header class="py-4 text-center bg-white shadow fixed top-0 w-full z-40 select-none">
+  <header class="py-4 text-center bg-white shadow fixed top-0 w-full z-40">
     <h1 class="text-3xl font-extrabold tracking-widest text-blue-700">S.L.O.T.H.</h1>
     <p class="text-xs text-gray-500 mt-1">System&nbsp;Lazily&nbsp;Optimized&nbsp;to&nbsp;Help</p>
   </header>
@@ -49,27 +51,20 @@
   <!-- アプリ本体 -->
   <div id="app-container" class="hidden container mx-auto p-6 pt-32">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-      <button id="back-to-selection" class="btn bg-gray-200 text-gray-700 px-3 py-1">&larr; 戻る</button>
+      <button id="back-to-selection" class="btn bg-gray-200 text-gray-700">&larr; 戻る</button>
       <div>
         <h2 id="main-title" class="text-2xl font-bold"></h2>
         <p id="main-subtitle" class="text-gray-500 text-sm"></p>
       </div>
-      <div class="flex items-center gap-3">
-        <label class="flex items-center text-sm font-medium gap-1 select-none">
-          <input type="checkbox" id="edit-toggle" class="accent-blue-600"> 編集モード
-        </label>
-      </div>
+      <label class="flex items-center text-sm font-medium gap-1">
+        <input type="checkbox" id="edit-toggle" class="accent-blue-600"> 編集モード
+      </label>
     </div>
 
-    <!-- テレビ用ソート UI -->
+    <!-- ソート UI -->
     <div id="sort-container" class="mb-6 hidden">
       <label class="text-sm font-semibold mr-2">並べ替え:</label>
-      <select id="sort-select" class="border rounded px-2 py-1 text-sm">
-        <option value="default">既定</option>
-        <option value="isDisplay">展示品 → 通常品</option>
-        <option value="サイズ(インチ)">サイズ昇順</option>
-        <option value="メーカー">メーカーA→Z</option>
-      </select>
+      <select id="sort-select" class="border rounded px-2 py-1 text-sm"></select>
     </div>
 
     <div id="filter-container" class="space-y-6 mb-8"></div>
@@ -84,13 +79,18 @@
   <!-- SCRIPT -->
   <script>
     /* ======================
+       定数
+    ====================== */
+    const G_API_KEY="AIzaSyDeGpivxKckNctsSKow4GUN4h2z0lw0aSg"; // ★ 限定公開向けキー
+
+    /* ======================
        データ／設定
     ====================== */
     const productConfigs={
       tv:{
         title:"テレビ比較",
         subtitle:"テレビを選択して比較",
-        dataUrl:"tv-data.json",
+        dataUrl:"data/tv/tv-data.json",
         modelNameKey:"モデル名",
         cardFields:[
           {label:"サイズ",key:"サイズ(インチ)",suffix:"インチ"},
@@ -100,29 +100,53 @@
           {key:"メーカー",label:"メーカー"},
           {key:"サイズ(インチ)",label:"サイズ"}
         ],
-        specialFlag:"isDisplay" // 展示品フラグ
-      },
-      ac:{
-        title:"エアコン比較",
-        subtitle:"エアコンを選択して比較",
-        dataUrl:"ac-data.json",
-        modelNameKey:"型番",
-        cardFields:[
-          {label:"畳数",key:"畳数"},
-          {label:"省エネ",key:"省エネ性能"}
+        sortOptions:[
+          {key:"default",label:"既定"},
+          {key:"メーカー",label:"メーカーA→Z"},
+          {key:"サイズ(インチ)",label:"サイズ昇順"},
+          {key:"isDisplay",label:"展示品 → 通常品"}
         ],
-        filters:[{key:"メーカー",label:"メーカー"}]
+        specialFlag:"isDisplay"
       },
       refrigerator:{
         title:"冷蔵庫比較",
         subtitle:"冷蔵庫を選択して比較",
-        dataUrl:"refrigerator-data.json",
+        dataUrl:"data/refrigerator/refrigerator-data.json",
         modelNameKey:"型番",
         cardFields:[
           {label:"容量",key:"定格内容積(L)",suffix:"L"},
           {label:"省エネ",key:"省エネ基準達成率(%)",suffix:"%"}
         ],
-        filters:[{key:"メーカー",label:"メーカー"}]
+        filters:[
+          {key:"メーカー",label:"メーカー"}
+        ],
+        sortOptions:[
+          {key:"default",label:"既定"},
+          {key:"メーカー",label:"メーカーA→Z"},
+          {key:"定格内容積(L)",label:"サイズ昇順"},
+          {key:"isDisplay",label:"展示品 → 通常品"}
+        ],
+        specialFlag:"isDisplay"
+      },
+      ac:{
+        title:"エアコン比較",
+        subtitle:"エアコンを選択して比較",
+        dataUrl:"data/ac/ac-data.json",
+        modelNameKey:"型番",
+        cardFields:[
+          {label:"畳数",key:"畳数"},
+          {label:"省エネ",key:"省エネ性能"}
+        ],
+        filters:[
+          {key:"メーカー",label:"メーカー"}
+        ],
+        sortOptions:[
+          {key:"default",label:"既定"},
+          {key:"メーカー",label:"メーカーA→Z"},
+          {key:"畳数",label:"サイズ昇順"},
+          {key:"isZeroEmi",label:"ゼロエミ → 非対象"}
+        ],
+        specialFlag:"isZeroEmi"
       }
     };
 
@@ -156,13 +180,22 @@
       const cfg=productConfigs[type];
       $("#main-title").textContent=cfg.title;
       $("#main-subtitle").textContent=cfg.subtitle;
-      $("#sort-container").classList.toggle("hidden",type!=='tv');
+
+      // Populate sort options
+      const sortSelect=$("#sort-select");
+      sortSelect.innerHTML=cfg.sortOptions.map(o=>`<option value="${o.key}">${o.label}</option>`).join('');
+      $("#sort-container").classList.remove('hidden');
 
       try{
         const res=await fetch(cfg.dataUrl);
         if(!res.ok)throw new Error(res.status);
         const json=await res.json();
-        appState.data=json.map((o,i)=>({...o,id:sid(o[cfg.modelNameKey]+i),isDisplay:/展示/.test(o["メーカー"])||o.isDisplay}));
+        appState.data=json.map((o,i)=>{
+          let flags={};
+          if(type==='tv' || type==='refrigerator')flags.isDisplay=/展示/.test(o["メーカー"])||o.isDisplay;
+          if(type==='ac')flags.isZeroEmi=o.isZeroEmi||/ゼロエミ|Zero|ZE/i.test(JSON.stringify(o));
+          return {...o,...flags,id:sid(o[cfg.modelNameKey]+i)}
+        });
         renderFilters();
         renderList();
         showApp();
@@ -191,7 +224,7 @@
 
     const makeFbtn=(k,val,lab)=>{
       const b=document.createElement("button");
-      b.className="btn bg-gray-200 text-gray-700 px-2 py-0.5 text-xs";
+      b.className="btn bg-gray-200 text-gray-700 text-xs";
       const active=(val===null)?!(k in appState.filters):appState.filters[k]===val;
       if(active)b.classList.add("btn-primary","text-white");
       b.textContent=lab;
@@ -209,68 +242,89 @@
       let list=[...appState.data];
       // filter
       Object.entries(appState.filters).forEach(([k,v])=>list=list.filter(d=>d[k]===v));
-      // sort for TV
-      if(appState.type==='tv'){
-        const key=$("#sort-select").value;
-        if(key!=='default'){
-          list.sort((a,b)=>{
-            if(key==='isDisplay')return(a.isDisplay===b.isDisplay)?0:(a.isDisplay?-1:1);
-            if(typeof a[key]==='number')return a[key]-b[key];
-            return String(a[key]).localeCompare(String(b[key]));
-          })
-        }
+      // sort
+      const sortKey=$("#sort-select").value;
+      if(sortKey!=='default'){
+        list.sort((a,b)=>{
+          if(sortKey==='isDisplay' || sortKey==='isZeroEmi')return(a[sortKey]===b[sortKey])?0:(a[sortKey]?-1:1);
+          const av=a[sortKey],bv=b[sortKey];
+          if(typeof av==='number' && typeof bv==='number')return av-bv;
+          // price string to number
+          if(/価格/.test(sortKey)){const parse=p=>Number(String(p).replace(/[^0-9]/g,''));return parse(av)-parse(bv);}            
+          return String(av).localeCompare(String(bv));
+        })
       }
       const wrap=$("#model-list");
       wrap.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
       wrap.innerHTML=list.map(m=>makeCard(m,cfg)).join("");
 
       // attach events
-      $$("#model-list .card").forEach(card=>card.onclick=e=>{
-        // avoid event if inside button
-        if(e.target.closest('button'))return;
+      $$("#model-list .card-root").forEach(card=>card.onclick=e=>{
+        if(e.target.closest('button'))return; // ignore if button inside
         const m=list.find(x=>x.id===card.dataset.id);
         detailModal(m,cfg);
       });
-      $$("#model-list .google-btn").forEach(btn=>btn.onclick=e=>{
-        e.stopPropagation();
-        window.open(`https://www.google.com/search?q=${encodeURIComponent(btn.dataset.q)}`,'_blank');
-      });
-      $$("#model-list .gemini-btn").forEach(btn=>btn.onclick=e=>{
-        e.stopPropagation();
-        askGemini(btn.dataset.q);
-      });
-      $$("#model-list .edit-btn").forEach(btn=>btn.onclick=e=>{
-        e.stopPropagation();
-        const m=list.find(x=>x.id===btn.dataset.id);
-        editModal(m);
-      })
+      $$("#model-list .btn-google").forEach(btn=>btn.onclick=e=>{e.stopPropagation();window.open(`https://www.google.com/search?q=${encodeURIComponent(btn.dataset.q)}`,'_blank');});
+      $$("#model-list .btn-gemini").forEach(btn=>btn.onclick=e=>{e.stopPropagation();askGemini(btn.dataset.q);});
+      $$("#model-list .btn-select").forEach(btn=>btn.onclick=e=>{e.stopPropagation();toggleSelect(btn.dataset.id);});
+      $$("#model-list .btn-edit").forEach(btn=>btn.onclick=e=>{e.stopPropagation();editModal(list.find(x=>x.id===btn.dataset.id));});
+
+      renderComparison();
     }
 
     function makeCard(m,cfg){
       const sel=appState.selected.includes(m.id);
-      const flag=cfg.specialFlag&&(m[cfg.specialFlag]||m.isDisplay);
-      return `<div class="card p-4 flex flex-col gap-2" data-id="${m.id}">
+      const flag=m[cfg.specialFlag];
+      return `<div class="card p-4 flex flex-col gap-2 card-root" data-id="${m.id}">
         <div class="flex justify-between items-start">
-          <h4 class="font-bold">${m[cfg.modelNameKey]}</h4>
+          <h4 class="font-semibold text-sm sm:text-base">${m[cfg.modelNameKey]}</h4>
           ${flag?'<span class="text-xs px-2 py-0.5 bg-yellow-400 rounded">展示品</span>':''}
         </div>
         <div class="text-sm space-y-1 mb-2">
           ${cfg.cardFields.map(f=>`<p><span class="font-medium">${f.label}:</span> ${m[f.key]}${f.suffix||''}</p>`).join('')}
         </div>
-        <div class="mt-auto flex gap-2 text-xs">
-          <button class="btn btn-primary flex-1 select-btn" data-id="${m.id}" ${sel?'disabled':''}>${sel?'選択中':'選択'}</button>
-          <button class="btn btn-secondary google-btn" data-q="${m[cfg.modelNameKey]}">Google</button>
-          <button class="btn btn-tertiary gemini-btn" data-q="${m[cfg.modelNameKey]}">Gemini</button>
-          ${appState.edit?`<button class="btn btn-danger edit-btn" data-id="${m.id}">編集</button>`:''}
+        <div class="mt-auto grid grid-cols-3 gap-2 text-xs">
+          <button class="btn btn-primary btn-select" data-id="${m.id}" ${sel?'disabled':''}>${sel?'選択中':'選択'}</button>
+          <button class="btn btn-secondary btn-google" data-q="${m[cfg.modelNameKey]}">Google</button>
+          <button class="btn btn-tertiary btn-gemini" data-q="${m[cfg.modelNameKey]}">Gemini</button>
         </div>
+        ${appState.edit?`<button class="btn btn-danger btn-edit mt-2" data-id="${m.id}">編集</button>`:''}
       </div>`
     }
 
-    // 選択切替
-    function toggleSelect(e){
-      const id=e.target.dataset.id;
-      if(appState.selected.includes(id))appState.selected=appState.selected.filter(x=>x!==id);else appState.selected.push(id);
+    /* ======================
+       選択／比較
+    ====================== */
+    function toggleSelect(id){
+      if(appState.selected.includes(id))appState.selected=appState.selected.filter(x=>x!==id);
+      else{
+        if(appState.selected.length>=6){alert('最大6件まで比較できます');return;}
+        appState.selected.push(id);
+      }
       renderList();
+    }
+
+    function renderComparison(){
+      const cont=$("#comparison-preview");
+      if(appState.selected.length===0){cont.innerHTML='';return;}
+      const cfg=productConfigs[appState.type];
+      const items=appState.data.filter(d=>appState.selected.includes(d.id));
+      const keys=[cfg.modelNameKey,...new Set(items.flatMap(i=>Object.keys(i)).filter(k=>k!=='id'))];
+      const headerRow=items.map(i=>`<th class='px-2 py-1 text-left whitespace-nowrap'>${i[cfg.modelNameKey]}</th>`).join('');
+      const bodyRows=keys.filter(k=>k!==cfg.modelNameKey).map(k=>`<tr><td class='font-medium pr-2 text-xs sm:text-sm'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs sm:text-sm'>${i[k]??'-'}</td>`).join('')}</tr>`).join('');
+      cont.innerHTML=`<div class="card p-4 overflow-auto animate-fade-in">
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-bold">比較 (${items.length}件)</h4>
+          <button class="btn btn-tertiary" id="btn-ask-gemini-comp">Gemini に聞く</button>
+        </div>
+        <div class="overflow-auto">
+          <table class="min-w-max text-xs sm:text-sm border-collapse">
+            <thead><tr><th></th>${headerRow}</tr></thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+      $("#btn-ask-gemini-comp").onclick=()=>askGemini(`次の ${appState.type} を比較して、特徴とおすすめポイントを箇条書きで教えて:\n`+items.map(i=>i[cfg.modelNameKey]).join(', '));
     }
 
     /* ======================
@@ -282,8 +336,8 @@
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 relative animate-fade-in">
           <button class="absolute top-3 right-3 text-xl" id="modal-close">×</button>
           <h3 class="text-2xl font-bold mb-4">${m[cfg.modelNameKey]}</h3>
-          <div class="space-y-1 text-sm">
-            ${Object.entries(m).filter(([k,v])=>k!=='id').map(([k,v])=>`<p><span class="font-medium">${k}</span>: ${v}</p>`).join('')}
+          <div class="space-y-1 text-sm max-w-full max-h-[70vh] overflow-auto">
+            ${Object.entries(m).filter(([k])=>k!=='id').map(([k,v])=>`<p><span class="font-medium">${k}</span>: ${v}</p>`).join('')}
           </div>
         </div>
       </div>`;
@@ -311,11 +365,10 @@
       $("#save-edit").onclick=()=>{
         try{
           const obj=JSON.parse($("#json-edit").value);
-          // ensure id stays the same
-          obj.id=m.id;
+          obj.id=m.id; // id固定
           const idx=appState.data.findIndex(x=>x.id===m.id);
           if(idx!==-1)appState.data[idx]=obj;
-          localStorage.setItem(`sloth_${appState.type}_data`,JSON.stringify(appState.data)); // optional persist
+          localStorage.setItem(`sloth_${appState.type}_data`,JSON.stringify(appState.data));
           root.innerHTML='';
           renderList();
         }catch(err){alert('JSON 構文エラー: '+err)}
@@ -323,22 +376,20 @@
     }
 
     /* ======================
-       Gemini 呼び出し（ダミー）
+       Gemini 呼び出し
     ====================== */
-    function askGemini(q){
-      // ローカルモデルに差し替える場合はここで呼び出し処理を書き換えるだけでOKです
-      alert(`"${q}" について Gemini に質問する処理を実装してください (ローカルモデルにも置き換え可)`);
+    async function askGemini(q){
+      try{
+        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${G_API_KEY}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{role:'user',parts:[{text:q}]}]})
+        });
+        const json=await res.json();
+        const text=json.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
+        alert(text);
+      }catch(err){alert('Gemini API error: '+err)}
     }
-
-    /* ======================
-       初期化：ローカルストレージのデータ優先
-    ====================== */
-    window.addEventListener('load',()=>{
-      ['tv','ac','refrigerator'].forEach(t=>{
-        const saved=localStorage.getItem(`sloth_${t}_data`);
-        if(saved)try{const d=JSON.parse(saved);if(Array.isArray(d)&&d.length)console.log(`${t} data loaded from LS`)}catch{}}
-      );
-    });
   </script>
 </body>
 </html>
