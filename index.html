@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>製品比較ツール</title>
+  <title>S.C.R.E.E.N – 製品比較ツール</title>
 
-  <!-- Tailwind CDN（開発時ならこれで OK。最終的には PurgeCSS で軽量化推奨） -->
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Markdownパーサ（Gemini の回答をレンダリングするとき用） -->
+  <!-- marked.js（Gemini の回答を Markdown で表示する際に使用）-->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
-    /* --- 必要最低限のカスタム CSS。詳細は前回と同じ --- */
-    body { font-family: 'Noto Sans JP', sans-serif; background:#f8f9fa; }
-    .card{background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.08);transition:.3s;}
-    .card:hover{transform:translateY(-5px);box-shadow:0 10px 25px rgba(0,0,0,.1);}
-    .btn{border-radius:8px;font-weight:500;transition:.2s;}
+    body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
+    .card{background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.08);transition:.3s}
+    .card:hover{transform:translateY(-5px);box-shadow:0 10px 25px rgba(0,0,0,.1)}
+    .btn{border-radius:8px;font-weight:500;transition:.2s}
     .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
     .btn-secondary{background:#6b7280;color:#fff}.btn-secondary:hover{background:#4b5563}
     .btn-tertiary{background:#10b981;color:#fff}.btn-tertiary:hover{background:#059669}
@@ -24,10 +23,15 @@
   </style>
 </head>
 <body class="antialiased text-gray-800">
-  <!-- ========== ① 製品カテゴリ選択画面 ========== -->
-  <div id="selection-screen" class="flex flex-col items-center justify-center min-h-screen p-6">
-    <h1 class="text-4xl font-bold mb-6">製品比較ツール</h1>
-    <p class="mb-10 text-gray-600">比較したい製品カテゴリを選んでください</p>
+  <!-- 0. ヘッダー（タイトルだけ） -->
+  <header class="py-4 text-center bg-white shadow fixed top-0 w-full z-40">
+    <h1 class="text-3xl font-extrabold tracking-widest text-blue-700">S.C.R.E.E.N</h1>
+    <p class="text-xs text-gray-500 mt-1">Smart Comparison & Review Engine for Every Need</p>
+  </header>
+
+  <!-- 1. カテゴリ選択画面 -->
+  <div id="selection-screen" class="flex flex-col items-center justify-center min-h-screen pt-24 p-6">
+    <p class="mb-10 text-gray-600">比較したいカテゴリを選択</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
       <button id="select-tv" class="card p-8 text-center hover:shadow-lg">
         <div class="text-5xl mb-4">📺</div><span class="text-xl font-semibold">テレビ</span>
@@ -41,249 +45,149 @@
     </div>
   </div>
 
-  <!-- ========== ② メインアプリ画面（初期は hidden） ========== -->
-  <div id="app-container" class="hidden container mx-auto p-6">
-    <!-- タイトル & 戻るボタン -->
-    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+  <!-- 2. アプリ本体 -->
+  <div id="app-container" class="hidden container mx-auto p-6 pt-28">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
       <button id="back-to-selection" class="btn bg-gray-200 text-gray-700 px-3 py-1">&larr; 戻る</button>
       <div>
         <h2 id="main-title" class="text-2xl font-bold"></h2>
-        <p id="main-subtitle" class="text-gray-500"></p>
+        <p id="main-subtitle" class="text-gray-500 text-sm"></p>
       </div>
-    </header>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center text-sm font-medium gap-1">
+          <input type="checkbox" id="edit-toggle" class="accent-blue-600"> 編集モード
+        </label>
+      </div>
+    </div>
 
-    <!-- フィルタ → モデル一覧 → 比較プレビュー（詳細は後述 JS が挿入） -->
+    <!-- ソート UI (TV 用) -->
+    <div id="sort-container" class="mb-6 hidden">
+      <label class="text-sm font-semibold mr-2">並べ替え:</label>
+      <select id="sort-select" class="border rounded px-2 py-1 text-sm">
+        <option value="default">既定</option>
+        <option value="isDisplay">展示品 → 通常品</option>
+        <option value="サイズ(インチ)">サイズ昇順</option>
+        <option value="メーカー">メーカー名A→Z</option>
+      </select>
+    </div>
+
     <div id="filter-container" class="space-y-6 mb-8"></div>
     <h3 id="model-list-title" class="text-xl font-bold mb-4"></h3>
     <div id="model-list" class="grid gap-6"></div>
     <div id="comparison-preview" class="my-8"></div>
   </div>
 
-  <!-- ========== ③ 各種モーダル (詳細表示や比較表など) ========== -->
+  <!-- 3. モーダル置き場 -->
   <div id="modal-root"></div>
 
-  <!-- ========== ④ メインスクリプト ========== -->
+  <!-- 4. スクリプト -->
   <script>
-    /* ----------------------------------------------------------------
-       A. ここで「カテゴリごとの設定」と「JSONファイルの場所」を定義
-    ---------------------------------------------------------------- */
-    const productConfigs = {
-      tv: {
-        title: "テレビ型番比較ツール",
-        subtitle: "気になるテレビを選択して性能を比較しましょう。",
-        dataUrl: "tv-data.json",          // ← JSON ファイルへのパス
-        modelNameKey: "モデル名",
-        cardFields: [
-          { label: "サイズ", key: "サイズ(インチ)", suffix: "インチ" },
-          { label: "解像度", key: "解像度" },
-          { label: "リフレッシュ", key: "リフレッシュレート" }
-        ],
-        filters: [
-          { key: "メーカー", label: "メーカーで絞り込み" },
-          { key: "ディスプレイ技術", label: "パネル種別" }
-        ]
-      },
-      ac: {
-        title: "エアコン型番比較ツール",
-        subtitle: "気になるエアコンを選択して性能を比較しましょう。",
-        dataUrl: "ac-data.json",
-        modelNameKey: "型番",
-        cardFields: [
-          { label: "畳数", key: "畳数" },
-          { label: "省エネ性能", key: "省エネ性能" },
-          { label: "冷暖房能力", key: "冷暖房能力" }
-        ],
-        filters: [
-          { key: "メーカー", label: "メーカーで絞り込み" },
-          { key: "畳数", label: "適用畳数" }
-        ]
-      },
-      refrigerator: {
-        title: "冷蔵庫型番比較ツール",
-        subtitle: "気になる冷蔵庫を選択して性能を比較しましょう。",
-        dataUrl: "refrigerator-data.json",
-        modelNameKey: "型番",
-        cardFields: [
-          { label: "容量", key: "定格内容積(L)", suffix: "L" },
-          { label: "省エネ達成率", key: "省エネ基準達成率(%)", suffix: "%" },
-          { label: "ドア", key: "ドアタイプ" }
-        ],
-        filters: [
-          { key: "メーカー", label: "メーカーで絞り込み" },
-          { key: "定格内容積(L)", label: "容量帯" }
-        ]
-      }
+    /********************* 設定 *********************/
+    const productConfigs={
+      tv:{title:"テレビ比較",subtitle:"テレビを選択して比較",dataUrl:"tv-data.json",modelNameKey:"モデル名",cardFields:[{label:"サイズ",key:"サイズ(インチ)",suffix:"インチ"},{label:"解像度",key:"解像度"}],filters:[{key:"メーカー",label:"メーカー"},{key:"サイズ(インチ)",label:"サイズ"}],specialFlag:"isDisplay"},
+      ac:{title:"エアコン比較",subtitle:"エアコンを選択して比較",dataUrl:"ac-data.json",modelNameKey:"型番",cardFields:[{label:"畳数",key:"畳数"},{label:"省エネ",key:"省エネ性能"}],filters:[{key:"メーカー",label:"メーカー"}]},
+      refrigerator:{title:"冷蔵庫比較",subtitle:"冷蔵庫を選択して比較",dataUrl:"refrigerator-data.json",modelNameKey:"型番",cardFields:[{label:"容量",key:"定格内容積(L)",suffix:"L"},{label:"省エネ",key:"省エネ基準達成率(%)",suffix:"%"}],filters:[{key:"メーカー",label:"メーカー"}]}
     };
 
-    /* ----------------------------------------------------------------
-       B. グローバル状態を持つシンプルなオブジェクト
-    ---------------------------------------------------------------- */
-    const appState = {
-      productType: null,
-      data: [],
-      selected: [],
-      filters: {}
-    };
+    /********************* 状態 *********************/
+    const appState={type:null,data:[],selected:[],filters:{},edit:false};
+    const $=s=>document.querySelector(s);
+    const $$=s=>document.querySelectorAll(s);
+    const sid=str=>str.replace(/\s+/g,'_').replace(/[^\w-]/g,'');
 
-    /* ----------------------------------------------------------------
-       C. ユーティリティ
-    ---------------------------------------------------------------- */
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => document.querySelectorAll(sel);
-    const sanitizeId = (str) => str.replace(/\s+/g,'_').replace(/[^\w-]/g,'');
+    /********************* 画面遷移 *********************/
+    const showSel=()=>{$("#selection-screen").classList.remove("hidden");$("#app-container").classList.add("hidden");};
+    const showApp=()=>{$("#selection-screen").classList.add("hidden");$("#app-container").classList.remove("hidden");};
 
-    /* ----------------------------------------------------------------
-       D. 画面遷移系
-    ---------------------------------------------------------------- */
-    function showSelection() {
-      $("#selection-screen").classList.remove("hidden");
-      $("#app-container").classList.add("hidden");
-    }
-    function showApp() {
-      $("#selection-screen").classList.add("hidden");
-      $("#app-container").classList.remove("hidden");
-    }
+    /********************* データ読み込み *********************/
+    async function launch(type){appState.type=type;appState.selected=[];appState.filters={};appState.edit=false;$("#edit-toggle").checked=false;
+      const cfg=productConfigs[type];
+      $("#main-title").textContent=cfg.title;$("#main-subtitle").textContent=cfg.subtitle;
+      $("#sort-container").classList.toggle("hidden",type!=="tv");
+      appState.data=await fetch(cfg.dataUrl).then(r=>r.json()).then(list=>list.map((o,i)=>({...o,id:sid(o[cfg.modelNameKey]+i),isDisplay:/展示/.test(o["メーカー"])||o.isDisplay})));
+      renderFilters();renderList();showApp();}
 
-    /* ----------------------------------------------------------------
-       E. データ読み込み & レンダリング
-    ---------------------------------------------------------------- */
-    async function launchApp(type) {
-      appState.productType = type;
-      appState.selected = [];
-      appState.filters = {};
+    /********************* フィルタ & ソート *********************/
+    function renderFilters(){const cfg=productConfigs[appState.type];const cont=$("#filter-container");cont.innerHTML="";
+      cfg.filters.forEach(f=>{const values=[...new Set(appState.data.map(d=>d[f.key]).filter(Boolean))].sort((a,b)=>a-b);
+        const sec=document.createElement("div");sec.innerHTML=`<h4 class="font-bold mb-1 text-sm">${f.label}</h4>`;
+        const wrap=document.createElement("div");wrap.className="flex flex-wrap gap-2";
+        wrap.appendChild(makeFbtn(f.key,null,"すべて"));values.forEach(v=>wrap.appendChild(makeFbtn(f.key,v,v)));
+        sec.appendChild(wrap);cont.appendChild(sec);});}
+    const makeFbtn=(k,val,label)=>{const b=document.createElement("button");b.className="btn bg-gray-200 text-gray-700 px-2 py-0.5 text-xs";
+      const active=(val===null)?!(k in appState.filters):appState.filters[k]===val;if(active)b.classList.add("btn-primary","text-white");
+      b.textContent=label;b.onclick=()=>{if(val===null)delete appState.filters[k];else appState.filters[k]=val;renderFilters();renderList();};return b};
 
-      const cfg = productConfigs[type];
-      $("#main-title").textContent = cfg.title;
-      $("#main-subtitle").textContent = cfg.subtitle;
+    $("#sort-select").onchange=()=>{renderList();};
 
-      // JSON を取得
-      appState.data = await fetch(cfg.dataUrl).then(r => r.json());
-
-      renderFilters();
-      renderModelList();
-      showApp();
-    }
-
-    function renderFilters() {
-      const cfg = productConfigs[appState.productType];
-      const container = $("#filter-container");
-      container.innerHTML = "";
-      cfg.filters.forEach(f => {
-        const values = [...new Set(appState.data.map(d => d[f.key]).filter(Boolean))].sort();
-        const section = document.createElement("div");
-        section.innerHTML = `<h4 class="font-bold mb-2">${f.label}</h4>`;
-        const btnWrap = document.createElement("div");
-        btnWrap.className = "flex flex-wrap gap-2";
-        // 「すべて」ボタン
-        btnWrap.appendChild(makeFilterBtn(f.key, "すべて", null));
-        values.forEach(v => btnWrap.appendChild(makeFilterBtn(f.key, v, v)));
-        section.appendChild(btnWrap);
-        container.appendChild(section);
-      });
-    }
-    function makeFilterBtn(key, label, value) {
-      const btn = document.createElement("button");
-      btn.textContent = label;
-      btn.className = "btn bg-gray-200 text-gray-700 px-3 py-1 text-sm";
-      if (appState.filters[key] === value || (value===null && !(key in appState.filters))) {
-        btn.classList.add("btn-primary","text-white");
-      }
-      btn.onclick = () => {
-        if (value === null) delete appState.filters[key];
-        else appState.filters[key] = value;
-        renderFilters();
-        renderModelList();
-      };
-      return btn;
-    }
-
-    function renderModelList() {
-      const cfg = productConfigs[appState.productType];
-      const wrap = $("#model-list");
-      wrap.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
-      let list = [...appState.data];
-
+    /********************* リスト描画 *********************/
+    function renderList(){const cfg=productConfigs[appState.type];let list=[...appState.data];
       // フィルタ適用
-      Object.entries(appState.filters).forEach(([k,v]) => {
-        list = list.filter(d => d[k] === v);
-      });
+      Object.entries(appState.filters).forEach(([k,v])=>{list=list.filter(d=>d[k]===v);});
+      // ソート (TV用)
+      if(appState.type==="tv"){const key=$("#sort-select").value;if(key!=="default"){
+        list.sort((a,b)=>{if(key==="isDisplay")return (a.isDisplay===b.isDisplay)?0:(a.isDisplay?-1:1);
+          if(typeof a[key]==="number")return a[key]-b[key];return String(a[key]).localeCompare(String(b[key]));});}}
+      const wrap=$("#model-list");wrap.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";wrap.innerHTML=list.map(m=>makeCard(m,cfg)).join("");
+      // イベント付与
+      $$("#model-list .select-btn").forEach(btn=>btn.onclick=toggleSelect);
+      $$("#model-list .detail-btn").forEach(btn=>btn.onclick=e=>showDetail(list.find(x=>x.id===e.target.dataset.id)));
+      $$("#model-list .google-btn").forEach(btn=>btn.onclick=e=>window.open(`https://www.google.com/search?q=${encodeURIComponent(btn.dataset.q)}`,"_blank"));
+      $$("#model-list .gemini-btn").forEach(btn=>btn.onclick=e=>askGemini(btn.dataset.q));
+      if(appState.edit){$$("#model-list .edit-btn").forEach(btn=>btn.onclick=e=>showEdit(list.find(x=>x.id===e.target.dataset.id)));}
+      renderPreview();}
 
-      // カード生成
-      wrap.innerHTML = list.map(item => {
-        const selected = appState.selected.includes(item);
-        return `
-          <div class="card p-5 ${selected?'ring-2 ring-blue-400':''}" data-id="${sanitizeId(item[cfg.modelNameKey])}">
-            <h3 class="text-lg font-bold mb-2">${item["メーカー"]} ${item[cfg.modelNameKey]}</h3>
-            ${cfg.cardFields.map(f => `
-              <p class="text-sm"><strong>${f.label}:</strong> ${item[f.key]||'—'}${f.suffix||''}</p>
-            `).join("")}
-            <button class="btn ${selected?'btn-secondary':'btn-primary'} text-xs px-3 py-1 mt-4 select-btn">
-              ${selected?'選択解除':'選択'}
-            </button>
-          </div>`;
-      }).join("");
-
-      // ボタンにイベント付与
-      $$("#model-list .select-btn").forEach(btn => {
-        btn.onclick = (e) => {
-          const card = e.target.closest(".card");
-          const id = card.dataset.id;
-          const model = list.find(d => sanitizeId(d[cfg.modelNameKey]) === id);
-          const idx = appState.selected.indexOf(model);
-          if (idx>-1) appState.selected.splice(idx,1); else appState.selected.push(model);
-          renderModelList();
-          renderComparisonPreview();
-        };
-      });
-      renderComparisonPreview();
-    }
-
-    function renderComparisonPreview() {
-      const wrap = $("#comparison-preview");
-      const sel = appState.selected;
-      if (!sel.length) { wrap.innerHTML = ""; return; }
-      wrap.innerHTML = `
-        <h4 class="font-bold mb-2">比較中 (${sel.length})</h4>
-        <div class="flex flex-wrap gap-2 mb-3">
-          ${sel.map(m => `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">${m["メーカー"]} ${m[productConfigs[appState.productType].modelNameKey]}</span>`).join("")}
+    const makeCard=(m,cfg)=>{
+      const sel=appState.selected.includes(m);
+      const badge=m.isDisplay?'<span class="inline-block bg-red-100 text-red-700 text-xs px-2 mr-1 rounded">展示品</span>':'');
+      return `<div class="card p-4 ${sel?'ring-2 ring-blue-400':''}" data-id="${m.id}">
+        ${badge}<h3 class="font-semibold mb-1 text-sm">${m["メーカー"].replace(/\s*展示/,'')} ${m[cfg.modelNameKey]}</h3>
+        ${cfg.cardFields.map(f=>`<p class="text-xs text-gray-600"><strong>${f.label}:</strong> ${m[f.key]}${f.suffix||''}</p>`).join('')}
+        <div class="mt-3 flex gap-1 flex-wrap">
+          <button class="btn ${sel?'btn-secondary':'btn-primary'} select-btn text-xs px-2 py-0.5" data-id="${m.id}">${sel?'解除':'選択'}</button>
+          <button class="btn bg-gray-200 text-gray-700 detail-btn text-xs px-2 py-0.5" data-id="${m.id}">詳細</button>
+          <button class="btn bg-green-200 text-green-800 google-btn text-xs px-2 py-0.5" data-q="${m["メーカー"].replace(/\s*展示/,'')} ${m[cfg.modelNameKey]}">Google</button>
+          <button class="btn btn-tertiary gemini-btn text-xs px-2 py-0.5" data-q="${m["メーカー"].replace(/\s*展示/,'')} ${m[cfg.modelNameKey]}">Gemini</button>
+          ${appState.edit?'<button class="btn btn-danger edit-btn text-xs px-2 py-0.5" data-id="'+m.id+'">編集</button>':''}
         </div>
-        <button class="btn btn-primary text-sm px-4 py-1" id="compare-btn">比較表を表示</button>
-      `;
-      $("#compare-btn")?.addEventListener("click", showComparisonModal);
-    }
+      </div>`};
 
-    function showComparisonModal() {
-      const cfg = productConfigs[appState.productType];
-      const sel = appState.selected;
-      const headers = Object.keys(sel[0]);
-      let html = `
-        <div class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" id="cmp-modal">
-          <div class="bg-white rounded-lg shadow-xl max-w-full max-h-full overflow-auto p-6">
-            <button class="text-2xl mb-4" id="cmp-close">&times;</button>
-            <table class="border-collapse text-sm">
-              <thead><tr><th class="border p-2 bg-gray-100">項目</th>${sel.map(m=>`<th class="border p-2 bg-gray-100">${m["メーカー"]}<br>${m[cfg.modelNameKey]}</th>`).join("")}</tr></thead>
-              <tbody>
-              ${headers.filter(h=>h!=="id").map(h=>`
-                <tr>
-                  <td class="border p-2 font-bold bg-gray-50">${h}</td>
-                  ${sel.map(m=>`<td class="border p-2">${m[h]||'—'}</td>`).join("")}
-                </tr>
-              `).join("")}
-              </tbody>
-            </table>
-          </div>
-        </div>`;
-      $("#modal-root").innerHTML = html;
-      $("#cmp-close").onclick = () => $("#cmp-modal").remove();
-    }
+    const toggleSelect=e=>{const id=e.target.dataset.id;const m=appState.data.find(x=>x.id===id);const idx=appState.selected.indexOf(m);if(idx>-1)appState.selected.splice(idx,1);else appState.selected.push(m);renderList();};
 
-    /* ----------------------------------------------------------------
-       F. イベント登録
-    ---------------------------------------------------------------- */
-    $("#select-tv").onclick = () => launchApp("tv");
-    $("#select-ac").onclick = () => launchApp("ac");
-    $("#select-refrigerator").onclick = () => launchApp("refrigerator");
-    $("#back-to-selection").onclick = showSelection;
+    /********************* 詳細モーダル *********************/
+    const showDetail=m=>{const keys=Object.keys(m).filter(k=>k!=="id");
+      $("#modal-root").innerHTML=`<div id="detail" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl max-h-full overflow-auto w-full max-w-lg p-6">
+      <button class="text-2xl mb-4" onclick="detail.remove()">&times;</button>
+      <h3 class="font-bold mb-4">${m["メーカー"].replace(/\s*展示/,'')} ${m[productConfigs[appState.type].modelNameKey]}</h3>
+      <table class="text-sm w-full border-collapse">${keys.map(k=>`<tr><th class="border p-1 bg-gray-50 text-left">${k}</th><td class="border p-1">${m[k]||'—'}</td></tr>`).join('')}</table></div></div>`;};
+
+    /********************* Gemini (外部API) *********************/
+    const askGemini=async(query)=>{alert(`Gemini への問い合わせ: \n${query}\n\n★ ここにローカル LLM を組み込む場合は WebAssembly / Serverless など別プロセスで処理し、この関数で呼び出してください。`);
+      /* TODO: Gemini API キーを使うならここで fetch */ };
+
+    /********************* 編集モード *********************/
+    $("#edit-toggle").onchange=e=>{appState.edit=e.target.checked;renderList();};
+
+    const showEdit=m=>{const cfg=productConfigs[appState.type];const fields=Object.keys(m).filter(k=>!['id'].includes(k));
+      const html=`<div id="edit-modal" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-full overflow-auto p-6">
+        <button class="text-2xl mb-4" onclick="editModal.remove()">&times;</button>
+        <h3 class="font-bold mb-4">編集: ${m[cfg.modelNameKey]}</h3>
+        <div class="space-y-3">${fields.map(f=>`<label class="block text-xs font-semibold">${f}<input class="border w-full px-2 py-1 text-sm" data-field="${f}" value="${m[f]||''}"></label>`).join('')}
+        <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" id="disp-check" ${m.isDisplay?'checked':''}> 展示品</label></div>
+        <button class="btn btn-primary mt-4" id="save-btn">保存</button>
+      </div></div>`;
+      $("#modal-root").innerHTML=html;
+      $("#save-btn").onclick=()=>{$$('#edit-modal [data-field]').forEach(inp=>{m[inp.dataset.field]=inp.value});m.isDisplay=$("#disp-check").checked;localStorage.setItem(appState.type+'-data-edited',JSON.stringify(appState.data));renderList();$("#edit-modal").remove();};};
+
+    /********************* 比較プレビュー *********************/
+    const renderPreview=()=>{const wrap=$("#comparison-preview"),sel=appState.selected;if(!sel.length){wrap.innerHTML="";return;}
+      wrap.innerHTML=`<h4 class="font-bold mb-2">比較中 (${sel.length})</h4><div class="flex flex-wrap gap-2 mb-3">${sel.map(m=>`<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">${m["メーカー"].replace(/\s*展示/,'')} ${m[productConfigs[appState.type].modelNameKey]}</span>`).join('')}</div><button class="btn btn-primary text-xs px-3 py-1" id="cmp-show">比較表</button>`;
+      $("#cmp-show").onclick=showCmp;};
+    const showCmp=()=>{const cfg=productConfigs[appState.type],sel=appState.selected,keys=Object.keys(sel[0]).filter(k=>k!=="id");
+      $("#modal-root").innerHTML=`<div id="cmp" class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"><div class="bg-white rounded-lg shadow-xl max-h-full overflow-auto w-full max-w-5xl p-6"><button class="text-2xl mb-4" onclick="cmp.remove()">&times;</button><table class="text-xs border-collapse w-full"><thead><tr><th class="border p-1 bg-gray-100">項目</th>${sel.map(m=>`<th class="border p-1 bg-gray-100">${m["メーカー"].replace(/\s*展示/,'')}<br>${m[cfg.modelNameKey]}</th>`).join('')}</tr></thead><tbody>${keys.map(k=>`<tr><th class="border p-1 bg-gray-50 text-left">${k}</th>${sel.map(m=>`<td class="border p-1">${m[k]||'—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;};
+
+    /********************* イベント登録 *********************/
+    $("#select-tv").onclick=()=>launch("tv");$("#select-ac").onclick=()=>launch("ac");$("#select-refrigerator").onclick=()=>launch("refrigerator");$("#back-to-selection").onclick=showSel;
   </script>
 </body>
 </html>
