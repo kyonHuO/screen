@@ -29,23 +29,25 @@
   </header>
 
   <!-- カテゴリ選択 -->
-  <div id="selection-screen" class="flex flex-col items-center justify-center min-h-screen pt-28 p-6">
+  <div id="selection-screen" class="flex flex-col items-center justify-center min-h-screen pt-32 p-6 text-center">
+    <h2 class="text-4xl font-extrabold text-blue-700 mb-1">S.L.O.T.H.</h2>
+    <p class="text-sm text-gray-500 mb-8">System Lazily Optimized to Help</p>
     <p class="mb-10 text-gray-600">比較したいカテゴリを選択</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
-      <div id="select-tv" class="card p-8 text-center hover:shadow-lg">
+      <div id="select-tv" class="card p-8">
         <div class="text-5xl mb-4" aria-hidden="true">📺</div><span class="text-xl font-semibold">テレビ</span>
       </div>
-      <div id="select-ac" class="card p-8 text-center hover:shadow-lg">
+      <div id="select-ac" class="card p-8">
         <div class="text-5xl mb-4" aria-hidden="true">💨</div><span class="text-xl font-semibold">エアコン</span>
       </div>
-      <div id="select-refrigerator" class="card p-8 text-center hover:shadow-lg">
+      <div id="select-refrigerator" class="card p-8">
         <div class="text-5xl mb-4" aria-hidden="true">🧊</div><span class="text-xl font-semibold">冷蔵庫</span>
       </div>
     </div>
   </div>
 
   <!-- アプリ本体 -->
-  <div id="app-container" class="hidden container mx-auto p-6 pt-28">
+  <div id="app-container" class="hidden container mx-auto p-6 pt-32">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
       <button id="back-to-selection" class="btn bg-gray-200 text-gray-700 px-3 py-1">&larr; 戻る</button>
       <div>
@@ -53,7 +55,7 @@
         <p id="main-subtitle" class="text-gray-500 text-sm"></p>
       </div>
       <div class="flex items-center gap-3">
-        <label class="flex items-center text-sm font-medium gap-1">
+        <label class="flex items-center text-sm font-medium gap-1 select-none">
           <input type="checkbox" id="edit-toggle" class="accent-blue-600"> 編集モード
         </label>
       </div>
@@ -81,21 +83,262 @@
 
   <!-- SCRIPT -->
   <script>
-    const productConfigs={tv:{title:"テレビ比較",subtitle:"テレビを選択して比較",dataUrl:"tv-data.json",modelNameKey:"モデル名",cardFields:[{label:"サイズ",key:"サイズ(インチ)",suffix:"インチ"},{label:"解像度",key:"解像度"}],filters:[{key:"メーカー",label:"メーカー"},{key:"サイズ(インチ)",label:"サイズ"}],specialFlag:"isDisplay"},ac:{title:"エアコン比較",subtitle:"エアコンを選択して比較",dataUrl:"ac-data.json",modelNameKey:"型番",cardFields:[{label:"畳数",key:"畳数"},{label:"省エネ",key:"省エネ性能"}],filters:[{key:"メーカー",label:"メーカー"}]},refrigerator:{title:"冷蔵庫比較",subtitle:"冷蔵庫を選択して比較",dataUrl:"refrigerator-data.json",modelNameKey:"型番",cardFields:[{label:"容量",key:"定格内容積(L)",suffix:"L"},{label:"省エネ",key:"省エネ基準達成率(%)",suffix:"%"}],filters:[{key:"メーカー",label:"メーカー"}]}};
+    /* ======================
+       データ／設定
+    ====================== */
+    const productConfigs={
+      tv:{
+        title:"テレビ比較",
+        subtitle:"テレビを選択して比較",
+        dataUrl:"tv-data.json",
+        modelNameKey:"モデル名",
+        cardFields:[
+          {label:"サイズ",key:"サイズ(インチ)",suffix:"インチ"},
+          {label:"解像度",key:"解像度"}
+        ],
+        filters:[
+          {key:"メーカー",label:"メーカー"},
+          {key:"サイズ(インチ)",label:"サイズ"}
+        ],
+        specialFlag:"isDisplay" // 展示品フラグ
+      },
+      ac:{
+        title:"エアコン比較",
+        subtitle:"エアコンを選択して比較",
+        dataUrl:"ac-data.json",
+        modelNameKey:"型番",
+        cardFields:[
+          {label:"畳数",key:"畳数"},
+          {label:"省エネ",key:"省エネ性能"}
+        ],
+        filters:[{key:"メーカー",label:"メーカー"}]
+      },
+      refrigerator:{
+        title:"冷蔵庫比較",
+        subtitle:"冷蔵庫を選択して比較",
+        dataUrl:"refrigerator-data.json",
+        modelNameKey:"型番",
+        cardFields:[
+          {label:"容量",key:"定格内容積(L)",suffix:"L"},
+          {label:"省エネ",key:"省エネ基準達成率(%)",suffix:"%"}
+        ],
+        filters:[{key:"メーカー",label:"メーカー"}]
+      }
+    };
 
+    /* ======================
+       状態／DOMユーティリティ
+    ====================== */
     const appState={type:null,data:[],selected:[],filters:{},edit:false};
-    const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),sid=s=>s.replace(/\s+/g,'_').replace(/[^\w-]/g,'');
+    const $=s=>document.querySelector(s);
+    const $$=s=>document.querySelectorAll(s);
+    const sid=s=>s.replace(/\s+/g,'_').replace(/[^\w-]/g,'');
 
     const showSel=()=>{$("#selection-screen").classList.remove("hidden");$("#app-container").classList.add("hidden");};
     const showApp=()=>{$("#selection-screen").classList.add("hidden");$("#app-container").classList.remove("hidden");};
 
-    async function launch(type){appState.type=type;appState.selected=[];appState.filters={};appState.edit=false;$("#edit-toggle").checked=false;const cfg=productConfigs[type];$("#main-title").textContent=cfg.title;$("#main-subtitle").textContent=cfg.subtitle;$("#sort-container").classList.toggle("hidden",type!=="tv");
-      try{const res=await fetch(cfg.dataUrl);if(!res.ok)throw new Error(res.status);const json=await res.json();appState.data=json.map((o,i)=>({...o,id:sid(o[cfg.modelNameKey]+i),isDisplay:/展示/.test(o["メーカー"])||o.isDisplay}));renderFilters();renderList();showApp();}
-      catch(err){alert(`データ読み込みに失敗しました (${err}). ファイルパスやJSON構文を確認してください。`);}}
+    /* ======================
+       起動
+    ====================== */
+    $("#select-tv").onclick=()=>launch('tv');
+    $("#select-ac").onclick=()=>launch('ac');
+    $("#select-refrigerator").onclick=()=>launch('refrigerator');
+    $("#back-to-selection").onclick=showSel;
+    $("#edit-toggle").onchange=e=>{appState.edit=e.target.checked;renderList();};
 
-    function renderFilters(){const cfg=productConfigs[appState.type];const cont=$("#filter-container");cont.innerHTML="";cfg.filters.forEach(f=>{const vals=[...new Set(appState.data.map(d=>d[f.key]).filter(Boolean))].sort((a,b)=>a-b);const sec=document.createElement("div");sec.innerHTML=`<h4 class='font-bold mb-1 text-sm'>${f.label}</h4>`;const wrap=document.createElement("div");wrap.className="flex flex-wrap gap-2";wrap.appendChild(makeFbtn(f.key,null,"すべて"));vals.forEach(v=>wrap.appendChild(makeFbtn(f.key,v,v)));sec.appendChild(wrap);cont.appendChild(sec);});}
-    const makeFbtn=(k,val,lab)=>{const b=document.createElement("button");b.className="btn bg-gray-200 text-gray-700 px-2 py-0.5 text-xs";const active=(val===null)?!(k in appState.filters):appState.filters[k]===val;if(active)b.classList.add("btn-primary","text-white");b.textContent=lab;b.onclick=()=>{if(val===null)delete appState.filters[k];else appState.filters[k]=val;renderFilters();renderList();};return b};
+    async function launch(type){
+      appState.type=type;
+      appState.selected=[];
+      appState.filters={};
+      appState.edit=false;
+      $("#edit-toggle").checked=false;
+
+      const cfg=productConfigs[type];
+      $("#main-title").textContent=cfg.title;
+      $("#main-subtitle").textContent=cfg.subtitle;
+      $("#sort-container").classList.toggle("hidden",type!=='tv');
+
+      try{
+        const res=await fetch(cfg.dataUrl);
+        if(!res.ok)throw new Error(res.status);
+        const json=await res.json();
+        appState.data=json.map((o,i)=>({...o,id:sid(o[cfg.modelNameKey]+i),isDisplay:/展示/.test(o["メーカー"])||o.isDisplay}));
+        renderFilters();
+        renderList();
+        showApp();
+      }catch(err){alert(`データ読み込みに失敗しました (${err}). ファイルパスやJSON構文を確認してください。`);}
+    }
+
+    /* ======================
+       フィルタ／ソート
+    ====================== */
+    function renderFilters(){
+      const cfg=productConfigs[appState.type];
+      const cont=$("#filter-container");
+      cont.innerHTML="";
+      cfg.filters.forEach(f=>{
+        const vals=[...new Set(appState.data.map(d=>d[f.key]).filter(Boolean))].sort((a,b)=>a-b);
+        const sec=document.createElement("div");
+        sec.innerHTML=`<h4 class='font-bold mb-1 text-sm'>${f.label}</h4>`;
+        const wrap=document.createElement("div");
+        wrap.className="flex flex-wrap gap-2";
+        wrap.appendChild(makeFbtn(f.key,null,"すべて"));
+        vals.forEach(v=>wrap.appendChild(makeFbtn(f.key,v,v)));
+        sec.appendChild(wrap);
+        cont.appendChild(sec);
+      });
+    }
+
+    const makeFbtn=(k,val,lab)=>{
+      const b=document.createElement("button");
+      b.className="btn bg-gray-200 text-gray-700 px-2 py-0.5 text-xs";
+      const active=(val===null)?!(k in appState.filters):appState.filters[k]===val;
+      if(active)b.classList.add("btn-primary","text-white");
+      b.textContent=lab;
+      b.onclick=()=>{if(val===null)delete appState.filters[k];else appState.filters[k]=val;renderFilters();renderList();};
+      return b
+    }
+
     $("#sort-select").onchange=()=>renderList();
 
-    function renderList(){const cfg=productConfigs[appState.type];let list=[...appState.data];Object.entries(appState.filters).forEach(([k,v])=>list=list.filter(d=>d[k]===v));if(appState.type==="tv"){const key=$("#sort-select").value;if(key!=="default"){list.sort((a,b)=>{if(key==="isDisplay")return(a.isDisplay===b.isDisplay)?0:(a.isDisplay?-1:1);if(typeof a[key]==="number")return a[key]-b[key];return String(a[key]).localeCompare(String(b[key]));});}}
-      const wrap=$("#model-list");wrap.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";wrap.innerHTML=list.map(m=>makeCard(m,cfg)).join("");$$("#model-list .select-btn").forEach(btn=>btn.onclick=toggleSelect);$$("#model-list .detail-btn").forEach(btn=>btn.onclick=e=>detail(list.find(x=>x.id===e.target.dataset.id)));$$("#model-list .google-btn").forEach(btn=>btn.onclick=e=>window.open(`https://www.google.com/search?q=${encodeURIComponent(btn.dataset.q)}`,'_blank'));$$("#model-list .gemini-btn").forEach(btn=>btn.onclick=e=>askGemini(btn.dataset.q));if(appState
+    /* ======================
+       リスト／カード生成
+    ====================== */
+    function renderList(){
+      const cfg=productConfigs[appState.type];
+      let list=[...appState.data];
+      // filter
+      Object.entries(appState.filters).forEach(([k,v])=>list=list.filter(d=>d[k]===v));
+      // sort for TV
+      if(appState.type==='tv'){
+        const key=$("#sort-select").value;
+        if(key!=='default'){
+          list.sort((a,b)=>{
+            if(key==='isDisplay')return(a.isDisplay===b.isDisplay)?0:(a.isDisplay?-1:1);
+            if(typeof a[key]==='number')return a[key]-b[key];
+            return String(a[key]).localeCompare(String(b[key]));
+          })
+        }
+      }
+      const wrap=$("#model-list");
+      wrap.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6";
+      wrap.innerHTML=list.map(m=>makeCard(m,cfg)).join("");
+
+      // attach events
+      $$("#model-list .card").forEach(card=>card.onclick=e=>{
+        // avoid event if inside button
+        if(e.target.closest('button'))return;
+        const m=list.find(x=>x.id===card.dataset.id);
+        detailModal(m,cfg);
+      });
+      $$("#model-list .google-btn").forEach(btn=>btn.onclick=e=>{
+        e.stopPropagation();
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(btn.dataset.q)}`,'_blank');
+      });
+      $$("#model-list .gemini-btn").forEach(btn=>btn.onclick=e=>{
+        e.stopPropagation();
+        askGemini(btn.dataset.q);
+      });
+      $$("#model-list .edit-btn").forEach(btn=>btn.onclick=e=>{
+        e.stopPropagation();
+        const m=list.find(x=>x.id===btn.dataset.id);
+        editModal(m);
+      })
+    }
+
+    function makeCard(m,cfg){
+      const sel=appState.selected.includes(m.id);
+      const flag=cfg.specialFlag&&(m[cfg.specialFlag]||m.isDisplay);
+      return `<div class="card p-4 flex flex-col gap-2" data-id="${m.id}">
+        <div class="flex justify-between items-start">
+          <h4 class="font-bold">${m[cfg.modelNameKey]}</h4>
+          ${flag?'<span class="text-xs px-2 py-0.5 bg-yellow-400 rounded">展示品</span>':''}
+        </div>
+        <div class="text-sm space-y-1 mb-2">
+          ${cfg.cardFields.map(f=>`<p><span class="font-medium">${f.label}:</span> ${m[f.key]}${f.suffix||''}</p>`).join('')}
+        </div>
+        <div class="mt-auto flex gap-2 text-xs">
+          <button class="btn btn-primary flex-1 select-btn" data-id="${m.id}" ${sel?'disabled':''}>${sel?'選択中':'選択'}</button>
+          <button class="btn btn-secondary google-btn" data-q="${m[cfg.modelNameKey]}">Google</button>
+          <button class="btn btn-tertiary gemini-btn" data-q="${m[cfg.modelNameKey]}">Gemini</button>
+          ${appState.edit?`<button class="btn btn-danger edit-btn" data-id="${m.id}">編集</button>`:''}
+        </div>
+      </div>`
+    }
+
+    // 選択切替
+    function toggleSelect(e){
+      const id=e.target.dataset.id;
+      if(appState.selected.includes(id))appState.selected=appState.selected.filter(x=>x!==id);else appState.selected.push(id);
+      renderList();
+    }
+
+    /* ======================
+       詳細モーダル
+    ====================== */
+    function detailModal(m,cfg){
+      const root=$("#modal-root");
+      root.innerHTML=`<div class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50" id="modal-overlay">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 relative animate-fade-in">
+          <button class="absolute top-3 right-3 text-xl" id="modal-close">×</button>
+          <h3 class="text-2xl font-bold mb-4">${m[cfg.modelNameKey]}</h3>
+          <div class="space-y-1 text-sm">
+            ${Object.entries(m).filter(([k,v])=>k!=='id').map(([k,v])=>`<p><span class="font-medium">${k}</span>: ${v}</p>`).join('')}
+          </div>
+        </div>
+      </div>`;
+      $("#modal-close").onclick=$("#modal-overlay").onclick=e=>{if(e.target.id==='modal-overlay'||e.target.id==='modal-close')root.innerHTML=''};
+    }
+
+    /* ======================
+       編集モーダル
+    ====================== */
+    function editModal(m){
+      const root=$("#modal-root");
+      const pre=JSON.stringify(m,null,2);
+      root.innerHTML=`<div class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50" id="modal-overlay">
+        <div class="bg-white rounded-2xl w-full max-w-2xl p-6 relative animate-fade-in flex flex-col gap-4">
+          <button class="absolute top-3 right-3 text-xl" id="modal-close">×</button>
+          <h3 class="text-xl font-bold">JSON 編集 – ${m.id}</h3>
+          <textarea id="json-edit" class="border p-2 flex-1 text-xs font-mono rounded h-96">${pre}</textarea>
+          <div class="flex justify-end gap-2 text-sm">
+            <button class="btn btn-secondary" id="cancel-edit">キャンセル</button>
+            <button class="btn btn-primary" id="save-edit">保存</button>
+          </div>
+        </div>
+      </div>`;
+      $("#cancel-edit").onclick=$("#modal-close").onclick=e=>{root.innerHTML=''};
+      $("#save-edit").onclick=()=>{
+        try{
+          const obj=JSON.parse($("#json-edit").value);
+          // ensure id stays the same
+          obj.id=m.id;
+          const idx=appState.data.findIndex(x=>x.id===m.id);
+          if(idx!==-1)appState.data[idx]=obj;
+          localStorage.setItem(`sloth_${appState.type}_data`,JSON.stringify(appState.data)); // optional persist
+          root.innerHTML='';
+          renderList();
+        }catch(err){alert('JSON 構文エラー: '+err)}
+      }
+    }
+
+    /* ======================
+       Gemini 呼び出し（ダミー）
+    ====================== */
+    function askGemini(q){
+      // ローカルモデルに差し替える場合はここで呼び出し処理を書き換えるだけでOKです
+      alert(`"${q}" について Gemini に質問する処理を実装してください (ローカルモデルにも置き換え可)`);
+    }
+
+    /* ======================
+       初期化：ローカルストレージのデータ優先
+    ====================== */
+    window.addEventListener('load',()=>{
+      ['tv','ac','refrigerator'].forEach(t=>{
+        const saved=localStorage.getItem(`sloth_${t}_data`);
+        if(saved)try{const d=JSON.parse(saved);if(Array.isArray(d)&&d.length)console.log(`${t} data loaded from LS`)}catch{}}
+      );
+    });
+  </script>
+</body>
+</html>
