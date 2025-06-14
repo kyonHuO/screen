@@ -7,121 +7,136 @@
 
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
   <style>
     body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
     .card{background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.08);transition:.3s;cursor:pointer}
     .card:hover{transform:translateY(-5px);box-shadow:0 10px 25px rgba(0,0,0,.1)}
-    .btn{border-radius:8px;font-weight:600;transition:.2s;padding:0.55rem 0.9rem;font-size:0.8rem}
+    .btn{border-radius:8px;font-weight:600;transition:.2s;padding:0.5rem 0.9rem;font-size:0.8rem}
     .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
     .btn-secondary{background:#6b7280;color:#fff}.btn-secondary:hover{background:#4b5563}
     .btn-tertiary{background:#10b981;color:#fff}.btn-tertiary:hover{background:#059669}
     .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
-    ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#a8a8a8;border-radius:4px}
     @keyframes fade-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
     .animate-fade-in{animation:fade-in .15s ease-out}
+    ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#a8a8a8;border-radius:4px}
   </style>
 </head>
 <body class="antialiased text-gray-800 select-none">
-  <!-- ヘッダー -->
   <header class="py-4 text-center bg-white shadow fixed top-0 w-full z-40">
     <h1 class="text-3xl font-extrabold tracking-widest text-blue-700">S.L.O.T.H.</h1>
     <p class="text-xs text-gray-500 mt-1">System&nbsp;Lazily&nbsp;Optimized&nbsp;to&nbsp;Help</p>
   </header>
 
   <!-- カテゴリ選択 -->
-  <div id="selection-screen" class="flex flex-col items-center justify-center min-h-screen pt-32 p-6 text-center">
+  <div id="selection" class="flex flex-col items-center justify-center min-h-screen pt-32 p-6 text-center">
     <h2 class="text-4xl font-extrabold text-blue-700 mb-1">S.L.O.T.H.</h2>
     <p class="text-sm text-gray-500 mb-8">System Lazily Optimized to Help</p>
     <p class="mb-10 text-gray-600">比較したいカテゴリを選択</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
-      <div id="select-tv" class="card p-8"><div class="text-5xl mb-4">📺</div><span class="text-xl font-semibold">テレビ</span></div>
-      <div id="select-ac" class="card p-8"><div class="text-5xl mb-4">💨</div><span class="text-xl font-semibold">エアコン</span></div>
-      <div id="select-refrigerator" class="card p-8"><div class="text-5xl mb-4">🧊</div><span class="text-xl font-semibold">冷蔵庫</span></div>
+      <div id="sel-tv"  class="card p-8"><div class="text-5xl mb-4">📺</div><span class="text-xl font-semibold">テレビ</span></div>
+      <div id="sel-ac"  class="card p-8"><div class="text-5xl mb-4">💨</div><span class="text-xl font-semibold">エアコン</span></div>
+      <div id="sel-ref" class="card p-8"><div class="text-5xl mb-4">🧊</div><span class="text-xl font-semibold">冷蔵庫</span></div>
     </div>
   </div>
 
-  <!-- アプリ本体 -->
-  <div id="app-container" class="hidden container mx-auto p-6 pt-32">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-      <button id="back-to-selection" class="btn bg-gray-200 text-gray-700">&larr; 戻る</button>
-      <div>
-        <h2 id="main-title" class="text-2xl font-bold"></h2>
-        <p id="main-subtitle" class="text-gray-500 text-sm"></p>
+  <!-- メイン画面 -->
+  <div id="app" class="hidden container mx-auto p-6 pt-32">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+      <div class="flex gap-2 items-center">
+        <button id="btn-back" class="btn bg-gray-200 text-gray-700">&larr; 戻る</button>
+        <label class="flex items-center text-sm font-medium gap-1"><input type="checkbox" id="toggle-edit" class="accent-blue-600"> 編集モード</label>
+        <button id="btn-add" class="btn btn-primary hidden">＋ 新規追加</button>
       </div>
-      <label class="flex items-center text-sm font-medium gap-1"><input type="checkbox" id="edit-toggle" class="accent-blue-600"> 編集モード</label>
+      <div>
+        <h2 id="title" class="text-2xl font-bold"></h2>
+        <p id="subtitle" class="text-gray-500 text-sm"></p>
+      </div>
+      <div id="sort-wrap" class="hidden">
+        <label class="text-sm font-semibold mr-1">並べ替え:</label>
+        <select id="sel-sort" class="border rounded px-2 py-1 text-sm">
+          <option value="メーカー">メーカー</option>
+          <option value="flag">展示品</option>
+          <option value="size">サイズ</option>
+        </select>
+      </div>
     </div>
 
-    <div id="sort-container" class="mb-6 hidden"><label class="text-sm font-semibold mr-2">並べ替え:</label><select id="sort-select" class="border rounded px-2 py-1 text-sm"></select></div>
+    <!-- 比較プレビュー（常に上） -->
+    <div id="compare" class="mb-6"></div>
 
-    <div id="filter-container" class="space-y-6 mb-8"></div>
-    <h3 id="model-list-title" class="text-xl font-bold mb-4"></h3>
-    <div id="model-list" class="grid gap-6"></div>
-    <div id="comparison-preview" class="my-8"></div>
+    <!-- フィルタとリスト -->
+    <div id="filter" class="space-y-6 mb-8"></div>
+    <div id="list" class="grid gap-6"></div>
   </div>
 
   <div id="modal-root"></div>
 
-  <!-- SCRIPT -->
   <script>
-    const G_API_KEY="AIzaSyDeGpivxKckNctsSKow4GUN4h2z0lw0aSg";
-
-    /* ====== カテゴリ設定 (JSON は index.html と同じディレクトリに配置) ====== */
-    const productConfigs={
-      tv:{title:'テレビ比較',subtitle:'テレビを選択して比較',file:'tv-data.json',key:'モデル名',flag:'isDisplay',filters:['メーカー','サイズ(インチ)'],card:[{l:'サイズ',k:'サイズ(インチ)',s:'インチ'},{l:'解像度',k:'解像度'}],sort:[['default','既定'],['メーカー','メーカーA→Z'],['サイズ(インチ)','サイズ昇順'],['isDisplay','展示品 → 通常品']]},
-      refrigerator:{title:'冷蔵庫比較',subtitle:'冷蔵庫を選択して比較',file:'refrigerator-data.json',key:'型番',flag:'isDisplay',filters:['メーカー'],card:[{l:'容量',k:'容量(L)',s:'L'},{l:'省エネ',k:'省エネ性能(★5段階)'}],sort:[['default','既定'],['メーカー','メーカーA→Z'],['容量(L)','サイズ昇順'],['isDisplay','展示品 → 通常品']]},
-      ac:{title:'エアコン比較',subtitle:'エアコンを選択して比較',file:'ac-data.json',key:'型番',flag:'isZeroEmi',filters:['メーカー'],card:[{l:'畳数',k:'畳数'},{l:'省エネ',k:'省エネ性能'}],sort:[['default','既定'],['メーカー','メーカーA→Z'],['畳数','サイズ昇順'],['isZeroEmi','ゼロエミ → 非対象']]}
+    const KEY="AIzaSyDeGpivxKckNctsSKow4GUN4h2z0lw0aSg";
+    const cfgs={
+      tv:{file:'tv-data.json',key:'モデル名',flag:'展示品',size:'サイズ(インチ)',title:'テレビ比較',subtitle:'テレビを選択して比較',filters:['メーカー','展示品']},
+      ref:{file:'refrigerator-data.json',key:'型番',flag:'展示品有無',size:'容量(L)',title:'冷蔵庫比較',subtitle:'冷蔵庫を選択して比較',filters:['メーカー','展示品有無']},
+      ac:{file:'ac-data.json',key:'型番',flag:'ゼロエミ',size:'畳数',title:'エアコン比較',subtitle:'エアコンを選択して比較',filters:['メーカー','ゼロエミ.有無']}
     };
 
-    const S={type:null,data:[],sel:[],flt:{},edit:false};
-    const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),sid=s=>s.replace(/\s+/g,'_').replace(/[^\w-]/g,'');
+    const S={cat:null,data:[],sel:[],flt:{},edit:false};
+    const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 
-    const showSel=()=>{$('#selection-screen').classList.remove('hidden');$('#app-container').classList.add('hidden');};
-    const showApp=()=>{$('#selection-screen').classList.add('hidden');$('#app-container').classList.remove('hidden');};
+    // ===== ナビゲーション =====
+    $('#sel-tv').onclick=()=>load('tv');
+    $('#sel-ac').onclick=()=>load('ac');
+    $('#sel-ref').onclick=()=>load('ref');
+    $('#btn-back').onclick=()=>{$('#selection').classList.remove('hidden');$('#app').classList.add('hidden');};
+    $('#toggle-edit').onchange=e=>{S.edit=e.target.checked;$('#btn-add').classList.toggle('hidden',!S.edit);render();};
+    $('#sel-sort').onchange=render;
+    $('#btn-add').onclick=()=>openEditor();
 
-    $('#select-tv').onclick=()=>launch('tv');
-    $('#select-ac').onclick=()=>launch('ac');
-    $('#select-refrigerator').onclick=()=>launch('refrigerator');
-    $('#back-to-selection').onclick=showSel;
-    $('#edit-toggle').onchange=e=>{S.edit=e.target.checked;renderList();};
+    // ===== データ読み込み =====
+    async function load(cat){
+      Object.assign(S,{cat,sel:[],flt:{},edit:false});$('#toggle-edit').checked=false;$('#btn-add').classList.add('hidden');
+      const c=cfgs[cat];$('#title').textContent=c.title;$('#subtitle').textContent=c.subtitle;$('#sort-wrap').classList.remove('hidden');try{const r=await fetch(c.file);if(!r.ok)throw r.status;S.data=await r.json();}catch(e){alert('読み込み失敗:'+e);return;}
+      $('#selection').classList.add('hidden');$('#app').classList.remove('hidden');render();}
 
-    async function launch(type){
-      Object.assign(S,{type,sel:[],flt:{},edit:false});$('#edit-toggle').checked=false;
-      const cfg=productConfigs[type];
-      $('#main-title').textContent=cfg.title;$('#main-subtitle').textContent=cfg.subtitle;
-      const sortSel=$('#sort-select');sortSel.innerHTML=cfg.sort.map(([k,l])=>`<option value="${k}">${l}</option>`).join('');$('#sort-container').classList.remove('hidden');
-      try{
-        const res=await fetch(cfg.file);
-        if(!res.ok)throw new Error(res.status);
-        const raw=await res.json();
-        S.data=raw.map((o,i)=>{const flags={};if(type!=='ac')flags.isDisplay=/展示/.test(o['メーカー']);else flags.isZeroEmi=o.isZeroEmi||/ゼロエミ|Zero|ZE/i.test(JSON.stringify(o));return {...o,...flags,id:sid(o[cfg.key]+i)};});
-        renderFilters();renderList();showApp();
-      }catch(err){alert(`データ読み込みに失敗しました (${err}).\nindex.html と同じフォルダに ${cfg.file} があるか確認してください。`);}
-    }
+    // ===== レンダリング =====
+    function render(){renderFilters();renderList();renderCompare();}
 
-    /* ===== フィルタ ===== */
-    function renderFilters(){const cfg=productConfigs[S.type];const c=$('#filter-container');c.innerHTML='';cfg.filters.forEach(k=>{const vals=[...new Set(S.data.map(d=>d[k]).filter(Boolean))];const sec=document.createElement('div');sec.innerHTML=`<h4 class='font-bold mb-1 text-sm'>${k}</h4>`;const w=document.createElement('div');w.className='flex flex-wrap gap-2';w.appendChild(fbtn(k,null,'すべて'));vals.forEach(v=>w.appendChild(fbtn(k,v,v)));sec.appendChild(w);c.appendChild(sec);});}
-    const fbtn=(k,v,l)=>{const b=document.createElement('button');b.className='btn bg-gray-200 text-gray-700 text-xs';if((v===null&&!S.flt[k])||(S.flt[k]===v))b.classList.add('btn-primary','text-white');b.textContent=l;b.onclick=()=>{v===null?delete S.flt[k]:S.flt[k]=v;renderFilters();renderList();};return b};
-    $('#sort-select').onchange=renderList;
+    function renderFilters(){const c=cfgs[S.cat];const wrap=$('#filter');wrap.innerHTML='';c.filters.forEach(k=>{const vals=[...new Set(S.data.map(d=>getField(d,k)).filter(Boolean))];const sec=document.createElement('div');sec.innerHTML=`<h4 class='font-bold mb-1 text-sm'>${k}</h4>`;const box=document.createElement('div');box.className='flex flex-wrap gap-2';box.appendChild(fbtn(k,null,'すべて'));vals.forEach(v=>box.appendChild(fbtn(k,v,v)));sec.appendChild(box);wrap.appendChild(sec);});}
+    const fbtn=(k,v,l)=>{const b=document.createElement('button');b.className='btn bg-gray-200 text-gray-700 text-xs';if((v===null&&!S.flt[k])||S.flt[k]===v)b.classList.add('btn-primary','text-white');b.textContent=l;b.onclick=()=>{v===null?delete S.flt[k]:S.flt[k]=v;render();};return b};
 
-    /* ===== リスト ===== */
-    function renderList(){const cfg=productConfigs[S.type];let list=[...S.data];Object.entries(S.flt).forEach(([k,v])=>list=list.filter(d=>d[k]===v));const sKey=$('#sort-select').value;if(sKey!=='default'){list.sort((a,b)=>{if(sKey==='isDisplay'||sKey==='isZeroEmi')return a[sKey]===b[sKey]?0:(a[sKey]?-1:1);const av=a[sKey],bv=b[sKey];if(/^\d+(?:L|円)?$/.test(av)&&/^\d+/.test(bv))return Number(av.replace(/[^0-9]/g,''))-Number(bv.replace(/[^0-9]/g,''));return String(av).localeCompare(String(bv));});}
-      const w=$('#model-list');w.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';w.innerHTML=list.map(m=>card(m,cfg)).join('');$$('#model-list .c-root').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;detail(list.find(x=>x.id===el.dataset.id),cfg);});$$('#model-list .btn-google').forEach(b=>b.onclick=e=>{e.stopPropagation();window.open(`https://www.google.com/search?q=${encodeURIComponent(b.dataset.q)}`,'_blank');});$$('#model-list .btn-gemini').forEach(b=>b.onclick=e=>{e.stopPropagation();askGemini(b.dataset.q);});$$('#model-list .btn-select').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleSel(b.dataset.id);});$$('#model-list .btn-edit').forEach(b=>b.onclick=e=>{e.stopPropagation();editModal(list.find(x=>x.id===b.dataset.id));});renderComp();}
+    function renderList(){const c=cfgs[S.cat];let list=[...S.data];Object.entries(S.flt).forEach(([k,v])=>list=list.filter(d=>getField(d,k)==v));const sort=$('#sel-sort').value;list.sort((a,b)=>{if(sort==='メーカー')return String(a['メーカー']).localeCompare(b['メーカー']);if(sort==='flag')return (getFlag(a,c)==getFlag(b,c)?0:(getFlag(a,c)?-1:1));const av=parseFloat(a[c.size]);const bv=parseFloat(b[c.size]);return av-bv;});const w=$('#list');w.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';w.innerHTML=list.map(d=>card(d,c)).join('');$$('#list .card-root').forEach(el=>el.onclick=e=>{if(e.target.closest('button'))return;openDetail(list.find(x=>x.id===el.dataset.id),c);});}
 
-    const card=(m,cfg)=>{const sel=S.sel.includes(m.id);const flag=m[cfg.flag];return `<div class="card p-4 flex flex-col gap-2 c-root" data-id="${m.id}"><div class="flex justify-between items-start"><h4 class="font-semibold text-sm sm:text-base">${m[cfg.key]}</h4>${flag?'<span class="text-xs px-2 py-0.5 bg-yellow-400 rounded">展示品</span>':''}</div><div class="text-sm space-y-1 mb-2">${cfg.card.map(f=>`<p><span class='font-medium'>${f.l}:</span> ${m[f.k]??'-'}${f.s||''}</p>`).join('')}</div><div class="mt-auto grid grid-cols-3 gap-2 text-xs"><button class="btn btn-primary btn-select" data-id="${m.id}" ${sel?'disabled':''}>${sel?'✓':'比較'}</button><button class="btn btn-secondary btn-google" data-q="${m[cfg.key]}">Google</button><button class="btn btn-tertiary btn-gemini" data-q="${m[cfg.key]}">Gemini</button></div>${S.edit?`<button class="btn btn-danger btn-edit mt-2" data-id="${m.id}">編集</button>`:''}</div>`};
+    function card(d,c){d.id=d.id||crypto.randomUUID();const sel=S.sel.includes(d.id);return `<div class='card p-4 flex flex-col gap-2 card-root' data-id='${d.id}'>
+      <div class='flex justify-between items-start'>
+        <h4 class='font-semibold text-sm sm:text-base'>${d[c.key]}</h4>
+        ${getFlag(d,c)?"<span class='text-xs px-2 py-0.5 bg-yellow-400 rounded'>展示品</span>":''}
+      </div>
+      <div class='text-xs space-y-1'>${['メーカー',c.size,getFlagLabel(c)].map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)}</p>`).join('')}</div>
+      <div class='mt-auto flex gap-1 text-xs'>
+        <button class='btn btn-primary flex-1' onclick='toggleSel("${d.id}")'>${sel?'解除':'比較'}</button>
+        <button class='btn btn-tertiary' onclick='askGemini("${d[c.key]}")'>Gemini</button>
+        ${S.edit?`<button class='btn btn-danger' onclick='openEditor("${d.id}")'>編集</button>`:''}
+      </div>
+    </div>`;}
 
-    function toggleSel(id){S.sel=S.sel.includes(id)?S.sel.filter(x=>x!==id):(S.sel.length<6?[...S.sel,id]:S.sel);renderList();}
+    // ===== 比較 =====
+    function toggleSel(id){S.sel=S.sel.includes(id)?S.sel.filter(x=>x!==id):(S.sel.length<6?[...S.sel,id]:S.sel);renderCompare();renderList();}
+    function renderCompare(){const c=$('#compare');if(!S.sel.length){c.innerHTML='';return;}const items=S.data.filter(d=>S.sel.includes(d.id));const cfg=cfgs[S.cat];const head=items.map(i=>`<th class='px-2 py-1'>${i[cfg.key]}<button class='ml-1 text-red-600' onclick='toggleSel("${i.id}")'>×</button></th>`).join('');const rows=[...'メーカー',cfg.size,getFlagLabel(cfg)].map(k=>`<tr><td class='font-medium pr-2 text-xs'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs'>${getField(i,k)}</td>`).join('')}</tr>`).join('');c.innerHTML=`<div class='card p-4 overflow-auto animate-fade-in'><div class='flex justify-between mb-2'><h4 class='font-bold'>比較 (${items.length}/6)</h4><button class='btn btn-tertiary' onclick='askGemini("${items.map(i=>i[cfg.key]).join(', ')} を比較して特徴を教えて")'>Geminiに聞く</button></div><table class='min-w-max text-xs border-collapse'><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;}
 
-    /* ===== 比較 ===== */
-    function renderComp(){const c=$('#comparison-preview');if(!S.sel.length){c.innerHTML='';return;}const cfg=productConfigs[S.type];const items=S.data.filter(d=>S.sel.includes(d.id));const keys=[cfg.key,...new Set(items.flatMap(i=>Object.keys(i)).filter(k=>k!=='id'))];const head=items.map(i=>`<th class='px-2 py-1 text-left whitespace-nowrap'>${i[cfg.key]}</th>`).join('');const body=keys.filter(k=>k!==cfg.key).map(k=>`<tr><td class='font-medium pr-2 text-xs sm:text-sm'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs sm:text-sm'>${i[k]??'-'}</td>`).join('')}</tr>`).join('');c.innerHTML=`<div class='card p-4 overflow-auto animate-fade-in'><div class='flex justify-between items-center mb-2'><h4 class='font-bold'>比較 (${items.length}件)</h4><button class='btn btn-tertiary' id='btn-ask-gemini-comp'>Gemini に聞く</button></div><div class='overflow-auto'><table class='min-w-max text-xs sm:text-sm border-collapse'><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;$('#btn-ask-gemini-comp').onclick=()=>askGemini(`次の ${S.type} を比較しポイントをまとめて:\n`+items.map(i=>i[cfg.key]).join(', '));}
+    // ===== モーダル =====
+    function openDetail(d,c){const r=$('#modal-root');r.innerHTML=`<div class='fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50' id='modal-bg'><div class='bg-white rounded-2xl max-w-lg w-full p-6 relative animate-fade-in'><button class='absolute top-3 right-3 text-xl' id='close-modal'>×</button><h3 class='text-xl font-bold mb-4'>${d[c.key]}</h3><div class='space-y-1 text-sm max-h-[70vh] overflow-auto'>${Object.entries(d).filter(([k])=>k!=='id').map(([k,v])=>`<p><span class='font-medium'>${k}</span>: ${JSON.stringify(v)}</p>`).join('')}</div></div></div>`;$('#close-modal').onclick=$('#modal-bg').onclick=e=>{if(e.target.id==='modal-bg'||e.target.id==='close-modal')r.innerHTML=''};}
 
-    /* ===== モーダル ===== */
-    function detail(m,cfg){const r=$('#modal-root');r.innerHTML=`<div class='fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50' id='modal-overlay'><div class='bg-white rounded-2xl max-w-lg w-full p-6 relative animate-fade-in'><button class='absolute top-3 right-3 text-xl' id='modal-close'>×</button><h3 class='text-2xl font-bold mb-4'>${m[cfg.key]}</h3><div class='space-y-1 text-sm max-h-[70vh] overflow-auto'>${Object.entries(m).filter(([k])=>k!=='id').map(([k,v])=>`<p><span class='font-medium'>${k}</span>: ${v}</p>`).join('')}</div></div></div>`;$('#modal-close').onclick=$('#modal-overlay').onclick=e=>{if(e.target.id==='modal-overlay'||e.target.id==='modal-close')r.innerHTML=''};}
-    function editModal(m){const r=$('#modal-root');r.innerHTML=`<div class='fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50' id='modal-overlay'><div class='bg-white rounded-2xl w-full max-w-2xl p-6 relative animate-fade-in flex flex-col gap-4'><button class='absolute top-3 right-3 text-xl' id='modal-close'>×</button><h3 class='text-xl font-bold'>JSON 編集 – ${m.id}</h3><textarea id='json-edit' class='border p-2 flex-1 text-xs font-mono rounded h-96'>${JSON.stringify(m,null,2)}</textarea><div class='flex justify-end gap-2 text-sm'><button class='btn btn-secondary' id='cancel-edit'>キャンセル</button><button class='btn btn-primary' id='save-edit'>保存</button></div></div></div>`;$('#cancel-edit').onclick=$('#modal-close').onclick=e=>{r.innerHTML=''};$('#save-edit').onclick=()=>{try{const obj=JSON.parse($('#json-edit').value);obj.id=m.id;const i=S.data.findIndex(x=>x.id===m.id);if(i!==-1)S.data[i]=obj;localStorage.setItem(`sloth_${S.type}_data`,JSON.stringify(S.data));r.innerHTML='';renderList();}catch(e){alert('JSON 構文エラー:'+e);}}}
+    // ===== 直感的エディタ =====
+    function openEditor(id){const cfg=cfgs[S.cat];const d=id?structuredClone(S.data.find(x=>x.id===id)):{};const newItem=!id;const r=$('#modal-root');const fields=[...new Set([...Object.keys(d),...['メーカー',cfg.key,cfg.size,cfg.flag]])];const opts={メーカー:[...new Set(S.data.map(x=>x['メーカー']).filter(Boolean))],展示品:['あり','なし'],展示品有無:['あり','なし'],'ゼロエミ.有無':['あり','なし']};const form=fields.map(k=>`<label class='block text-sm font-medium mt-2'>${k}<select class='border rounded w-full p-1 text-sm' name='${k}'>${(opts[k]||[]).map(v=>`<option ${getField(d,k)==v?'selected':''}>${v}</option>`).join('')}<option value='' ${getField(d,k)?'':'selected'}>— 入力 —</option></select><input type='text' class='border rounded w-full p-1 text-sm mt-1' name='${k}-text' value='${getField(d,k)||''}'></label>`).join('');r.innerHTML=`<div class='fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50' id='modal-bg'><div class='bg-white rounded-2xl w-full max-w-lg p-6 relative animate-fade-in'><button class='absolute top-3 right-3 text-xl' id='close-modal'>×</button><h3 class='text-xl font-bold mb-4'>${newItem?'新規追加':'編集'}</h3><form id='f-edit' class='space-y-1 max-h-[70vh] overflow-auto'>${form}</form><div class='flex justify-end gap-2 mt-4'><button class='btn btn-secondary' id='cancel'>キャンセル</button><button class='btn btn-primary' id='save'>保存</button></div></div></div>`;
+      $('#cancel').onclick=$('#close-modal').onclick=e=>{r.innerHTML=''};
+      $('#save').onclick=()=>{const fd=new FormData($('#f-edit'));const obj=newItem?{id:crypto.randomUUID()}:d;fields.forEach(k=>{const v=fd.get(k);const t=fd.get(`${k}-text`);obj[k]=v||t||'';});if(newItem)S.data.push(obj);localStorage.setItem(cfg.file,JSON.stringify(S.data));r.innerHTML='';render();};}
 
-    /* ===== Gemini ===== */
-    async function askGemini(q){try{const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${G_API_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:q}]}]})});const js=await res.json();alert(js.candidates?.[0]?.content?.parts?.[0]?.text||'No response');}catch(e){alert('Gemini API error:'+e);}}
+    // ===== ユーティリティ =====
+    function getField(o,k){if(k.includes('.')){const [a,b]=k.split('.');return o[a]?.[b];}return o[k];}
+    function getFlag(o,c){return getField(o,c.flag)=='あり';}
+    function getFlagLabel(c){return c.flag.replace(/\..*/,"");}
+
+    // ===== Gemini =====
+    async function askGemini(q){try{const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:q}]}]})});const j=await r.json();alert(j.candidates?.[0]?.content?.parts?.[0]?.text||'No response');}catch(e){alert('Gemini error:'+e);}}
   </script>
 </body>
 </html>
