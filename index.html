@@ -1,10 +1,10 @@
-<!-- Mark 3 -->
+<!-- Mark 4 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>S.L.O.T.H. – 製品比較ツール (Mark 3)</title>
+  <title>S.L.O.T.H. – 製品比較ツール (Mark 4)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
@@ -29,7 +29,7 @@
   <!-- カテゴリ選択 -->
   <div id="screen-select" class="flex flex-col items-center justify-center min-h-screen pt-32 p-6 text-center">
     <h2 class="text-4xl font-extrabold text-blue-700 mb-1">S.L.O.T.H.</h2>
-    <p class="text-sm text-gray-500 mb-8">Smart Comparison & Rating Engine – Mark 3</p>
+    <p class="text-sm text-gray-500 mb-8">Smart Comparison & Rating Engine – Mark 4</p>
     <p class="mb-10 text-gray-600">比較したいカテゴリを選択</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
       <button data-cat="tv"  class="card p-8 focus:outline-none cat-btn"><div class="text-5xl mb-4">📺</div><span class="text-xl font-semibold">テレビ</span></button>
@@ -92,17 +92,30 @@
     Object.assign(S,{cat,sel:[],flt:{},edit:false});
     $('#chk-edit').checked = false; $('#btn-add').classList.add('hidden');
     const cfg = cfgs[cat];
-    $('#hdg-title').textContent = cfg.title + ' (Mark 3)';
+    $('#hdg-title').textContent = cfg.title + ' (Mark 4)';
     $('#hdg-sub').textContent   = cfg.subtitle;
     $('#sortbox').classList.remove('hidden');
+
+    // v4 FIX: JSON が取得できない場合は localStorage から復旧
+    let data = [];
     try {
       const res = await fetch(cfg.file);
-      if(!res.ok) throw new Error(res.status);
-      S.data = await res.json();
+      if(res.ok){
+        data = await res.json();
+      } else {
+        throw new Error(res.status);
+      }
     } catch(err){
-      alert('JSON 読み込み失敗: ' + err);
-      return;
+      const saved = localStorage.getItem(cfg.file);
+      if(saved){
+        data = JSON.parse(saved);
+        console.warn('ネットワークから取得できなかったため localStorage のデータを使用します', err);
+      } else {
+        console.warn('データソースが見つからなかったため空データで起動します', err);
+      }
     }
+    S.data = data;
+
     $('#screen-select').classList.add('hidden');
     $('#screen-app').classList.remove('hidden');
     render();
@@ -138,7 +151,7 @@
     for(const [k,v] of Object.entries(S.flt)) list = list.filter(d=>getField(d,k)==v);
     const sKey = $('#sel-sort').value;
     list.sort((a,b) => {
-      if(sKey==='maker') return a['メーカー']?.localeCompare(b['メーカー']);
+      if(sKey==='maker') return (a['メーカー']||'').localeCompare(b['メーカー']||'');
       if(sKey==='flag')  return (isFlag(a,cfg)===isFlag(b,cfg))?0:(isFlag(a,cfg)?-1:1);
       const av=parseFloat(a[cfg.size])||0, bv=parseFloat(b[cfg.size])||0; return av-bv;
     });
@@ -151,7 +164,7 @@
       <div class='flex justify-between items-start'><h4 class='font-semibold text-xs sm:text-sm'>${d[cfg.key]}</h4>${isFlag(d,cfg)?`<span class='text-xs px-2 py-0.5 bg-yellow-400 rounded'>${cfg.flagLabel}</span>`:''}</div>
       <div class='text-xs space-y-1'>${['メーカー',cfg.size,cfg.flagLabel].map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)??'-'}</p>`).join('')}</div>
       <div class='mt-auto grid grid-cols-4 gap-1 text-xs'>
-        <button class='btn btn-primary col-span-2'>${sel?'解除':'比較'}</button>
+        <button class='btn btn-primary col-span-2' onclick='event.stopPropagation();toggleSel("${d.id}")'>${sel?'解除':'比較'}</button>
         <button class='btn btn-secondary' onclick='event.stopPropagation();window.open("https://www.google.com/search?q=${encodeURIComponent(d[cfg.key])}")'>🔍</button>
         <button class='btn btn-tertiary' onclick='event.stopPropagation();askGemini("${d[cfg.key]}")'>G</button>
       </div>
@@ -181,12 +194,18 @@
   function openDetail(d,cfg){ const keys=allKeys(d); modal(`<div class='bg-white rounded-xl max-w-lg w-full p-6'><h3 class='text-lg font-bold mb-4'>${d[cfg.key]}</h3><div class='space-y-1 text-xs max-h-[70vh] overflow-auto'>${keys.map(k=>`<p><span class='font-medium'>${k}</span>: ${JSON.stringify(getField(d,k))}</p>`).join('')}</div><button class='btn btn-primary mt-4' id='md-close'>閉じる</button></div>`); }
 
   /* ============== エディタ ============== */
-  function openEditor(id){ const cfg=cfgs[S.cat]; const d=id?structuredClone(S.data.find(x=>x.id===id)):{id:crypto.randomUUID()}; const newItem=!id; const spec={展示品:['あり','なし'],展示品有無:['あり','なし'],'ゼロエミ.有無':['あり','なし']}; if(newItem){ /* no defaults */ }
-    const keys=allKeys(d); const rows=keys.map(k=>{ const v=getField(d,k)??''; const sel=spec[k]!=undefined; const opts=sel?spec[k].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join(''):''; return `<div><label class='text-xs font-medium'>${k}</label>${sel?`<select class='border rounded w-full p-1 text-xs' name='${k}'>${opts}</select>`:`<input class='border rounded w-full p-1 text-xs' name='${k}' value='${v}'>`}</div>` }).join(''); modal(`<div class='bg-white rounded-xl w-full max-w-lg p-6 flex flex-col'><h3 class='text-lg font-bold mb-4'>${newItem?'新規':'編集'}</h3><form id='f-edit' class='grid grid-cols-2 gap-2 overflow-auto max-h-[60vh]'>${rows}</form><div class='flex justify-end gap-2 mt-4'><button class='btn btn-secondary' id='md-close'>キャンセル</button><button class='btn btn-primary' id='md-save'>保存</button></div></div>`);
+  function openEditor(id){ const cfg=cfgs[S.cat]; const d=id?structuredClone(S.data.find(x=>x.id===id)):{id:crypto.randomUUID()}; const newItem=!id; const spec={展示品:['あり','なし'],展示品有無:['あり','なし'],'ゼロエミ.有無':['あり','なし']};
+    const keys=newItem?Object.keys(S.data[0]||{}):allKeys(d);
+    const rows=keys.map(k=>{ const v=getField(d,k)??''; const sel=spec[k]!=undefined; const opts=sel?spec[k].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join(''):''; return `<div><label class='text-xs font-medium'>${k}</label>${sel?`<select class='border rounded w-full p-1 text-xs' name='${k}'>${opts}</select>`:`<input class='border rounded w-full p-1 text-xs' name='${k}' value='${v}'>`}</div>` }).join('');
+    modal(`<div class='bg-white rounded-xl w-full max-w-lg p-6 flex flex-col'><h3 class='text-lg font-bold mb-4'>${newItem?'新規':'編集'}</h3><form id='f-edit' class='grid grid-cols-2 gap-2 overflow-auto max-h-[60vh]'>${rows}</form><div class='flex justify-end gap-2 mt-4'><button class='btn btn-secondary' id='md-close'>キャンセル</button><button class='btn btn-primary' id='md-save'>保存</button></div></div>`);
     $('#md-save').addEventListener('click',()=>{ const fd=new FormData($('#f-edit')); keys.forEach(k=>setField(d,k,fd.get(k))); if(newItem) S.data.push(d); localStorage.setItem(cfg.file, JSON.stringify(S.data)); $('#modal-root').innerHTML=''; render(); }); }
 
   /* ============== ユーティリティ ============== */
   function allKeys(o){ return typeof o==='object'&&o!==null?Object.entries(o).flatMap(([k,v])=> typeof v==='object'&&v!==null?Object.keys(v).map(s=>`${k}.${s}`):[k]):[]; }
   function getField(o,k){ if(k.includes('.')){ const[a,b]=k.split('.'); return o[a]?.[b]; } return o[k]; }
   function setField(o,k,v){ if(k.includes('.')){ const[a,b]=k.split('.'); o[a]=o[a]||{}; o[a][b]=v; } else o[k]=v; }
-  function isFlag(o,cfg){ return getField
+  function isFlag(o,cfg){ const val=getField(o,cfg.flag); return val==='あり' || val===true || val==='Yes'; }
+  /* ============================================ */
+  </script>
+</body>
+</html>
