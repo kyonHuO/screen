@@ -1,10 +1,10 @@
-<!-- Mark Ⅳ -->
+<!-- Mark Ⅶ -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>S.L.O.T.H. – 製品比較ツール (Mark Ⅳ)</title>
+  <title>S.L.O.T.H. – 製品比較ツール Ⅶ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
@@ -21,15 +21,22 @@
   </style>
 </head>
 <body class="antialiased text-gray-800 select-none">
+  <script>
+    /* =========  バージョン定義 ========= */
+    const VERSION_NUM = 7;
+    const romanMap = ['','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ'];
+    const VERSION = romanMap[VERSION_NUM] || VERSION_NUM;
+  </script>
+
   <header class="py-4 text-center bg-white shadow fixed top-0 w-full z-40">
-    <h1 class="text-3xl font-extrabold tracking-widest text-blue-700">S.L.O.T.H.</h1>
+    <h1 class="text-3xl font-extrabold tracking-widest text-blue-700">S.L.O.T.H. <span class="text-base align-top" id="verHeader"></span></h1>
     <p class="text-xs text-gray-500 mt-1">System Lazily Optimized to Help</p>
   </header>
 
   <!-- カテゴリ選択 -->
   <div id="screen-select" class="flex flex-col items-center justify-center min-h-screen pt-32 p-6 text-center">
     <h2 class="text-4xl font-extrabold text-blue-700 mb-1">S.L.O.T.H.</h2>
-    <p class="text-sm text-gray-500 mb-8">Smart Comparison & Rating Engine – Mark 4</p>
+    <p class="text-sm text-gray-500 mb-8">Smart Comparison & Rating Engine – <span id="verLead"></span></p>
     <p class="mb-10 text-gray-600">比較したいカテゴリを選択</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
       <button data-cat="tv"  class="card p-8 focus:outline-none cat-btn"><div class="text-5xl mb-4">📺</div><span class="text-xl font-semibold">テレビ</span></button>
@@ -56,6 +63,7 @@
           <option value="maker">メーカー</option>
           <option value="flag">展示/ゼロエミ</option>
           <option value="size">サイズ</option>
+          <option value="price">価格</option>
         </select>
       </div>
     </div>
@@ -66,146 +74,165 @@
 
   <div id="modal-root"></div>
 
-  <script>
-  /* ============== 定数 & 設定 ============== */
-  const API_KEY = "AIzaSyDeGpivxKckNctsSKow4GUN4h2z0lw0aSg";
-  const cfgs = {
-    tv : { file:'tv-data.json',  key:'モデル名', flag:'展示品',       flagLabel:'展示品', size:'サイズ(インチ)', title:'テレビ比較',   subtitle:'テレビを選択して比較',   filters:['メーカー','展示品'] },
-    ac : { file:'ac-data.json',  key:'型番',   flag:'ゼロエミ.有無', flagLabel:'ゼロエミ', size:'畳数',         title:'エアコン比較', subtitle:'エアコンを選択して比較', filters:['メーカー','ゼロエミ.有無'] },
-    ref: { file:'refrigerator-data.json', key:'型番', flag:'展示品有無', flagLabel:'展示品', size:'容量(L)',     title:'冷蔵庫比較', subtitle:'冷蔵庫を選択して比較',   filters:['メーカー','展示品有無'] }
-  };
-  const S = { cat:null, data:[], sel:[], flt:{}, edit:false };
-  const $  = s => document.querySelector(s);
-  const $$ = s => document.querySelectorAll(s);
+<script>
+/* ============== 定数 & 設定 ============== */
+const cfgs = {
+  tv : { file:'tv-data.json',  key:'モデル名', flag:'展示品',       flagLabel:'展示品', size:'サイズ(インチ)', price:'店舗価格', priceLabel:'価格', title:'テレビ比較',   subtitle:'テレビを選択して比較',   filters:[] },
+  ac : { file:'ac-data.json',  key:'型番',   flag:'ゼロエミ.有無', flagLabel:'ゼロエミ', size:'畳数',         price:'店舗価格', priceLabel:'価格', title:'エアコン比較', subtitle:'エアコンを選択して比較', filters:['メーカー','ゼロエミ.有無'] },
+  ref: { file:'refrigerator-data.json', key:'型番', flag:'展示品有無', flagLabel:'展示品', size:'容量(L)',     price:'店舗価格', priceLabel:'価格', title:'冷蔵庫比較', subtitle:'冷蔵庫を選択して比較',   filters:['メーカー','展示品有無'] }
+};
+const S = { cat:null, data:[], sel:[], flt:{}, edit:false };
+const $  = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
 
-  /* ============== 初期化 ============== */
-  document.addEventListener('DOMContentLoaded', () => {
-    $$('.cat-btn').forEach(btn => btn.addEventListener('click', () => load(btn.dataset.cat)));
-    $('#btn-back').addEventListener('click', () => { $('#screen-select').classList.remove('hidden'); $('#screen-app').classList.add('hidden'); });
-    $('#chk-edit').addEventListener('change', e => { S.edit = e.target.checked; $('#btn-add').classList.toggle('hidden', !S.edit); render(); });
-    $('#sel-sort').addEventListener('change', render);
-    $('#btn-add').addEventListener('click', () => openEditor());
+/* ========= 初期表示 ========= */
+$('#verHeader').textContent = VERSION;
+$('#verLead').textContent = VERSION;
+
+document.addEventListener('DOMContentLoaded', () => {
+  $$('.cat-btn').forEach(btn => btn.addEventListener('click', () => load(btn.dataset.cat)));
+  $('#btn-back').addEventListener('click', () => { $('#screen-select').classList.remove('hidden'); $('#screen-app').classList.add('hidden'); });
+  $('#chk-edit').addEventListener('change', e => { S.edit = e.target.checked; $('#btn-add').classList.toggle('hidden', !S.edit); render(); });
+  $('#sel-sort').addEventListener('change', render);
+  $('#btn-add').addEventListener('click', () => openEditor());
+});
+
+/* ============== データ読み込みと画面切替 ============== */
+async function load(cat){
+  Object.assign(S,{cat,sel:[],flt:{},edit:false});
+  $('#chk-edit').checked = false; $('#btn-add').classList.add('hidden');
+  const cfg = cfgs[cat];
+  $('#hdg-title').textContent = `${cfg.title} (${VERSION})`;
+  $('#hdg-sub').textContent   = cfg.subtitle;
+  $('#sortbox').classList.remove('hidden');
+
+  let data = [];
+  try {
+    const res = await fetch(cfg.file);
+    if(res.ok) data = await res.json(); else throw new Error(res.status);
+  } catch(err){
+    const saved = localStorage.getItem(cfg.file);
+    if(saved) data = JSON.parse(saved);
+    console.warn('データソースが見つからないため localStorage にフォールバック / 空配列', err);
+  }
+  S.data = data;
+
+  $('#screen-select').classList.add('hidden');
+  $('#screen-app').classList.remove('hidden');
+  render();
+}
+
+/* ============== 描画関数群 ============== */
+function render(){ renderFilters(); renderList(); renderCompare(); }
+
+function renderFilters(){
+  const cfg = cfgs[S.cat];
+  const box = $('#filter'); box.innerHTML = '';
+  cfg.filters.forEach(k => {
+    const vals = [...new Set(S.data.map(d => getField(d,k)).filter(Boolean))];
+    const sec = document.createElement('div');
+    sec.innerHTML = `<h4 class='font-bold mb-1 text-sm'>${k}</h4>`;
+    const wrap = document.createElement('div'); wrap.className = 'flex flex-wrap gap-2';
+    wrap.appendChild(fbtn(k,null,'すべて'));
+    vals.forEach(v => wrap.appendChild(fbtn(k,v,v)));
+    sec.appendChild(wrap); box.appendChild(sec);
   });
+}
+function fbtn(key,val,label){
+  const b = document.createElement('button'); b.className='btn bg-gray-200 text-gray-700 text-xs';
+  if((val===null && !S.flt[key]) || S.flt[key]===val) b.classList.add('btn-primary','text-white');
+  b.textContent = label;
+  b.onclick = () => { val===null ? delete S.flt[key] : S.flt[key]=val; render(); };
+  return b;
+}
 
-  /* ============== データ読み込みと画面切替 ============== */
-  async function load(cat){
-    Object.assign(S,{cat,sel:[],flt:{},edit:false});
-    $('#chk-edit').checked = false; $('#btn-add').classList.add('hidden');
-    const cfg = cfgs[cat];
-    $('#hdg-title').textContent = cfg.title + ' (Mark 4)';
-    $('#hdg-sub').textContent   = cfg.subtitle;
-    $('#sortbox').classList.remove('hidden');
-
-    // v4 FIX: JSON が取得できない場合は localStorage から復旧
-    let data = [];
-    try {
-      const res = await fetch(cfg.file);
-      if(res.ok){
-        data = await res.json();
-      } else {
-        throw new Error(res.status);
-      }
-    } catch(err){
-      const saved = localStorage.getItem(cfg.file);
-      if(saved){
-        data = JSON.parse(saved);
-        console.warn('ネットワークから取得できなかったため localStorage のデータを使用します', err);
-      } else {
-        console.warn('データソースが見つからなかったため空データで起動します', err);
-      }
-    }
-    S.data = data;
-
-    $('#screen-select').classList.add('hidden');
-    $('#screen-app').classList.remove('hidden');
-    render();
-  }
-
-  /* ============== 描画関数群 ============== */
-  function render(){ renderFilters(); renderList(); renderCompare(); }
-
-  function renderFilters(){
-    const cfg = cfgs[S.cat];
-    const box = $('#filter'); box.innerHTML = '';
-    cfg.filters.forEach(k => {
-      const vals = [...new Set(S.data.map(d => getField(d,k)).filter(Boolean))];
-      const sec = document.createElement('div');
-      sec.innerHTML = `<h4 class='font-bold mb-1 text-sm'>${k}</h4>`;
-      const wrap = document.createElement('div'); wrap.className = 'flex flex-wrap gap-2';
-      wrap.appendChild(fbtn(k,null,'すべて'));
-      vals.forEach(v => wrap.appendChild(fbtn(k,v,v)));
-      sec.appendChild(wrap); box.appendChild(sec);
-    });
-  }
-  function fbtn(key,val,label){
-    const b = document.createElement('button'); b.className='btn bg-gray-200 text-gray-700 text-xs';
-    if((val===null && !S.flt[key]) || S.flt[key]===val) b.classList.add('btn-primary','text-white');
-    b.textContent = label;
-    b.onclick = () => { val===null ? delete S.flt[key] : S.flt[key]=val; render(); };
-    return b;
-  }
-
-  function renderList(){
-    const cfg = cfgs[S.cat];
-    let list = [...S.data];
-    for(const [k,v] of Object.entries(S.flt)) list = list.filter(d=>getField(d,k)==v);
-    const sKey = $('#sel-sort').value;
-    list.sort((a,b) => {
-      if(sKey==='maker') return (a['メーカー']||'').localeCompare(b['メーカー']||'');
-      if(sKey==='flag')  return (isFlag(a,cfg)===isFlag(b,cfg))?0:(isFlag(a,cfg)?-1:1);
+function renderList(){
+  const cfg = cfgs[S.cat];
+  let list = [...S.data];
+  for(const [k,v] of Object.entries(S.flt)) list = list.filter(d=>getField(d,k)==v);
+  const sKey = $('#sel-sort').value;
+  list.sort((a,b) => {
+    if(sKey==='maker') return (a['メーカー']||'').localeCompare(b['メーカー']||'');
+    if(sKey==='flag')  return (isFlag(a,cfg)===isFlag(b,cfg))?0:(isFlag(a,cfg)?-1:1);
+    if(sKey==='size'){
       const av=parseFloat(a[cfg.size])||0, bv=parseFloat(b[cfg.size])||0; return av-bv;
-    });
-    const wrap = $('#list'); wrap.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
-    wrap.innerHTML = list.map(d=>card(d,cfg)).join('');
-    $$('#list .card-root').forEach(el => el.addEventListener('click', e => { if(!e.target.closest('button')) openDetail(list.find(x=>x.id===el.dataset.id),cfg);}));
-  }
-  function card(d,cfg){ d.id = d.id || crypto.randomUUID(); const sel=S.sel.includes(d.id);
-    return `<div class='card p-4 flex flex-col gap-2 card-root' data-id='${d.id}'>
-      <div class='flex justify-between items-start'><h4 class='font-semibold text-xs sm:text-sm'>${d[cfg.key]}</h4>${isFlag(d,cfg)?`<span class='text-xs px-2 py-0.5 bg-yellow-400 rounded'>${cfg.flagLabel}</span>`:''}</div>
-      <div class='text-xs space-y-1'>${['メーカー',cfg.size,cfg.flagLabel].map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)??'-'}</p>`).join('')}</div>
-      <div class='mt-auto grid grid-cols-4 gap-1 text-xs'>
-        <button class='btn btn-primary col-span-2' onclick='event.stopPropagation();toggleSel("${d.id}")'>${sel?'解除':'比較'}</button>
-        <button class='btn btn-secondary' onclick='event.stopPropagation();window.open("https://www.google.com/search?q=${encodeURIComponent(d[cfg.key])}")'>🔍</button>
-        <button class='btn btn-tertiary' onclick='event.stopPropagation();askGemini("${d[cfg.key]}")'>G</button>
-      </div>
-      ${S.edit?`<button class='btn btn-danger mt-1' onclick='event.stopPropagation();openEditor("${d.id}")'>編集</button>`:''}
-    </div>`;
-  }
+    }
+    if(sKey==='price'){
+      const av=toPrice(getField(a,cfg.price)), bv=toPrice(getField(b,cfg.price)); return av-bv;
+    }
+    return 0;
+  });
+  const wrap = $('#list'); wrap.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
+  wrap.innerHTML = list.map(d=>card(d,cfg)).join('');
+  $$('#list .card-root').forEach(el => el.addEventListener('click', e => { if(!e.target.closest('button')) openDetail(list.find(x=>x.id===el.dataset.id),cfg);}));
+}
+function card(d,cfg){ d.id = d.id || crypto.randomUUID(); const sel=S.sel.includes(d.id);
+  // 表示フィールドをカテゴリで切替
+  const fields = S.cat==='tv' ? [cfg.size,cfg.priceLabel] : ['メーカー',cfg.size,cfg.flagLabel,cfg.priceLabel];
+  return `<div class='card p-4 flex flex-col gap-2 card-root' data-id='${d.id}'>
+    <div class='flex justify-between items-start'><h4 class='font-semibold text-xs sm:text-sm'>${d[cfg.key]}</h4>${isFlag(d,cfg)&&S.cat!=='tv'?`<span class='text-xs px-2 py-0.5 bg-yellow-400 rounded'>${cfg.flagLabel}</span>`:''}</div>
+    <div class='text-xs space-y-1'>${fields.map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)??'-'}</p>`).join('')}</div>
+    <div class='mt-auto grid grid-cols-4 gap-1 text-xs'>
+      <button class='btn btn-primary col-span-2' onclick='event.stopPropagation();toggleSel("${d.id}")'>${sel?'解除':'比較'}</button>
+      <button class='btn btn-secondary' onclick='event.stopPropagation();window.open("https://www.google.com/search?q=${encodeURIComponent(d[cfg.key])}")'>🔍</button>
+      <button class='btn btn-tertiary' onclick='event.stopPropagation();askGemini("${d[cfg.key]}")'>G</button>
+    </div>
+    ${S.edit?`<button class='btn btn-danger mt-1' onclick='event.stopPropagation();openEditor("${d.id}")'>編集</button>`:''}
+  </div>`;
+}
 
-  /* ============== 比較パネル ============== */
-  function toggleSel(id){ S.sel = S.sel.includes(id)? S.sel.filter(x=>x!==id) : (S.sel.length<6?[...S.sel,id]:S.sel); renderCompare(); renderList(); }
-  function renderCompare(){
-    const box = $('#cmp'); if(!S.sel.length){ box.innerHTML=''; return; }
-    const cfg = cfgs[S.cat]; const items = S.data.filter(d=>S.sel.includes(d.id));
-    const head = items.map(i=>`<th class='px-2 py-1'>${i[cfg.key]}<button class='ml-1 text-red-600' onclick='toggleSel("${i.id}")'>×</button></th>`).join('');
-    const rows = ['メーカー',cfg.size,cfg.flagLabel].map(k=>`<tr><td class='font-medium pr-2 text-xs'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs'>${getField(i,k)??'-'}</td>`).join('')}</tr>`).join('');
-    box.innerHTML = `<div class='card p-4 mb-4 ani'><div class='flex justify-between mb-2'><strong>比較 (${items.length}/6)</strong><div class='flex gap-2'><button class='btn btn-secondary' onclick='openBig(${JSON.stringify(items.map(x=>x.id))})'>全画面</button><button class='btn btn-tertiary' onclick='askGemini("${items.map(i=>i[cfg.key]).join(', ')} を比較して特徴まとめて")'>G</button></div></div><table class='min-w-max text-xs border-collapse'><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
-  }
-  function openBig(ids){ const items=S.data.filter(d=>ids.includes(d.id)), cfg=cfgs[S.cat]; const keys=[...new Set(items.flatMap(allKeys))];
-    const head=items.map(i=>`<th class='px-2 py-1 text-left'>${i[cfg.key]}</th>`).join('');
-    const body=keys.map(k=>`<tr><td class='font-medium pr-2 align-top text-xs'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs'>${JSON.stringify(getField(i,k)??'-')}</td>`).join('')}</tr>`).join('');
-    modal(`<div class='bg-white rounded-xl w-[95vw] h-[90vh] p-4 flex flex-col'><div class='flex justify-between items-center mb-2'><h3 class='text-lg font-bold'>フル比較</h3><button class='text-xl' id='md-close'>×</button></div><div class='overflow-auto border rounded grow'><table class='min-w-max text-xs border-collapse'><thead class='sticky top-0 bg-white shadow'><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`);
-  }
+/* ============== 比較パネル ============== */
+function toggleSel(id){ S.sel = S.sel.includes(id)? S.sel.filter(x=>x!==id) : (S.sel.length<6?[...S.sel,id]:S.sel); renderCompare(); renderList(); }
+function renderCompare(){
+  const box = $('#cmp'); if(!S.sel.length){ box.innerHTML=''; return; }
+  const cfg = cfgs[S.cat]; const items = S.data.filter(d=>S.sel.includes(d.id));
+  const head = items.map(i=>`<th class='px-2 py-1'>${i[cfg.key]}<button class='ml-1 text-red-600' onclick='toggleSel("${i.id}")'>×</button></th>`).join('');
+  const rowsKeys = S.cat==='tv' ? [cfg.size,cfg.priceLabel] : ['メーカー',cfg.size,cfg.flagLabel,cfg.priceLabel];
+  const rows = rowsKeys.map(k=>`<tr><td class='font-medium pr-2 text-xs'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs'>${getField(i,k)??'-'}</td>`).join('')}</tr>`).join('');
+  box.innerHTML = `<div class='card p-4 mb-4 ani'><div class='flex justify-between mb-2'><strong>比較 (${items.length}/6)</strong><div class='flex gap-2'><button class='btn btn-secondary' onclick='openBig(${JSON.stringify(items.map(x=>x.id))})'>全画面</button></div></div><table class='min-w-max text-xs border-collapse'><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function openBig(ids){ const items=S.data.filter(d=>ids.includes(d.id)), cfg=cfgs[S.cat]; const keys=[...new Set(items.flatMap(allKeys))];
+  const head=items.map(i=>`<th class='px-2 py-1 text-left'>${i[cfg.key]}</th>`).join('');
+  const body=keys.map(k=>`<tr><td class='font-medium pr-2 align-top text-xs'>${k}</td>${items.map(i=>`<td class='px-2 py-1 text-xs'>${JSON.stringify(getField(i,k)??'-')}</td>`).join('')}</tr>`).join('');
+  modal(`<div class='bg-white rounded-xl w-[95vw] h-[90vh] p-4 flex flex-col'><div class='flex justify-between items-center mb-2'><h3 class='text-lg font-bold'>フル比較</h3><button class='text-xl' id='md-close'>×</button></div><div class='overflow-auto border rounded grow'><table class='min-w-max text-xs border-collapse'><thead class='sticky top-0 bg-white shadow'><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`);
+}
 
-  /* ============== モーダル共通 ============== */
-  function modal(html){ const r=$('#modal-root'); r.innerHTML = `<div class='fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50' id='md-bg'><div class='ani'>${html}</div></div>`; $('#md-bg').addEventListener('click', e=>{ if(e.target.id==='md-bg' || e.target.id==='md-close') r.innerHTML=''; }); }
+/* ============== モーダル共通 ============== */
+function modal(html){ const r=$('#modal-root'); r.innerHTML = `<div class='fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50' id='md-bg'><div class='ani'>${html}</div></div>`; $('#md-bg').addEventListener('click', e=>{ if(e.target.id==='md-bg' || e.target.id==='md-close') r.innerHTML=''; }); }
 
-  /* ============== 詳細モーダル ============== */
-  function openDetail(d,cfg){ const keys=allKeys(d); modal(`<div class='bg-white rounded-xl max-w-lg w-full p-6'><h3 class='text-lg font-bold mb-4'>${d[cfg.key]}</h3><div class='space-y-1 text-xs max-h-[70vh] overflow-auto'>${keys.map(k=>`<p><span class='font-medium'>${k}</span>: ${JSON.stringify(getField(d,k))}</p>`).join('')}</div><button class='btn btn-primary mt-4' id='md-close'>閉じる</button></div>`); }
+/* ============== 詳細モーダル ============== */
+function openDetail(d,cfg){ const keys=allKeys(d); modal(`<div class='bg-white rounded-xl max-w-lg w-full p-6'><h3 class='text-lg font-bold mb-4'>${d[cfg.key]}</h3><div class='space-y-1 text-xs max-h-[70vh] overflow-auto'>${keys.map(k=>`<p><span class='font-medium'>${k}</span>: ${JSON.stringify(getField(d,k))}</p>`).join('')}</div><button class='btn btn-primary mt-4' id='md-close'>閉じる</button></div>`); }
 
-  /* ============== エディタ ============== */
-  function openEditor(id){ const cfg=cfgs[S.cat]; const d=id?structuredClone(S.data.find(x=>x.id===id)):{id:crypto.randomUUID()}; const newItem=!id; const spec={展示品:['あり','なし'],展示品有無:['あり','なし'],'ゼロエミ.有無':['あり','なし']};
-    const keys=newItem?Object.keys(S.data[0]||{}):allKeys(d);
-    const rows=keys.map(k=>{ const v=getField(d,k)??''; const sel=spec[k]!=undefined; const opts=sel?spec[k].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join(''):''; return `<div><label class='text-xs font-medium'>${k}</label>${sel?`<select class='border rounded w-full p-1 text-xs' name='${k}'>${opts}</select>`:`<input class='border rounded w-full p-1 text-xs' name='${k}' value='${v}'>`}</div>` }).join('');
-    modal(`<div class='bg-white rounded-xl w-full max-w-lg p-6 flex flex-col'><h3 class='text-lg font-bold mb-4'>${newItem?'新規':'編集'}</h3><form id='f-edit' class='grid grid-cols-2 gap-2 overflow-auto max-h-[60vh]'>${rows}</form><div class='flex justify-end gap-2 mt-4'><button class='btn btn-secondary' id='md-close'>キャンセル</button><button class='btn btn-primary' id='md-save'>保存</button></div></div>`);
-    $('#md-save').addEventListener('click',()=>{ const fd=new FormData($('#f-edit')); keys.forEach(k=>setField(d,k,fd.get(k))); if(newItem) S.data.push(d); localStorage.setItem(cfg.file, JSON.stringify(S.data)); $('#modal-root').innerHTML=''; render(); }); }
+/* ============== エディタ ============== */
+function openEditor(id){ const cfg=cfgs[S.cat]; const d=id?structuredClone(S.data.find(x=>x.id===id)):{id:crypto.randomUUID()}; const newItem=!id; const spec={展示品:['あり','なし'],展示品有無:['あり','なし'],'ゼロエミ.有無':['あり','なし']};
+  // 編集対象キー
+  const keys=new Set(Object.keys(cfg).filter(k=>['key','title','subtitle','flag','flagLabel','size','price','priceLabel'].includes(k)).map(k=>cfg[k]));
+  Object.keys(S.data[0]||{}).forEach(k=>keys.add(k));
+  const rows=[...keys].map(k=>{ if(['id'].includes(k)) return ''; const v=getField(d,k)??''; const sel=spec[k]!=undefined; const opts=sel?spec[k].map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join(''):''; return `<div><label class='text-xs font-medium'>${k}</label>${sel?`<select class='border rounded w-full p-1 text-xs' name='${k}'>${opts}</select>`:`<input class='border rounded w-full p-1 text-xs' name='${k}' value='${v}'>`}</div>` }).join('');
+  modal(`<div class='bg-white rounded-xl w-full max-w-lg p-6 flex flex-col'><h3 class='text-lg font-bold mb-4'>${newItem?'新規':'編集'}</h3><form id='f-edit' class='grid grid-cols-2 gap-2 overflow-auto max-h-[60vh]'>${rows}</form><div class='flex justify-end gap-2 mt-4'><button class='btn btn-secondary' id='md-close'>キャンセル</button><button class='btn btn-primary' id='md-save'>保存</button></div></div>`);
+  $('#md-save').addEventListener('click',()=>{
+    const fd=new FormData($('#f-edit'));
+    [...keys].forEach(k=>setField(d,k,fd.get(k)));
+    if(newItem) S.data.push(d); else {
+      const idx=S.data.findIndex(x=>x.id===d.id); if(idx>-1) S.data[idx]=d;
+    }
+    saveData(cfg.file); $('#modal-root').innerHTML=''; render();
+  }); }
 
-  /* ============== ユーティリティ ============== */
-  function allKeys(o){ return typeof o==='object'&&o!==null?Object.entries(o).flatMap(([k,v])=> typeof v==='object'&&v!==null?Object.keys(v).map(s=>`${k}.${s}`):[k]):[]; }
-  function getField(o,k){ if(k.includes('.')){ const[a,b]=k.split('.'); return o[a]?.[b]; } return o[k]; }
-  function setField(o,k,v){ if(k.includes('.')){ const[a,b]=k.split('.'); o[a]=o[a]||{}; o[a][b]=v; } else o[k]=v; }
-  function isFlag(o,cfg){ const val=getField(o,cfg.flag); return val==='あり' || val===true || val==='Yes'; }
-  /* ============================================ */
-  </script>
+/* ============== 保存 (localStorage & DL) ============== */
+function saveData(file){ localStorage.setItem(file, JSON.stringify(S.data)); // auto download
+  const blob=new Blob([JSON.stringify(S.data,null,2)], {type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=file; a.style.display='none'; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
+}
+
+/* ============== ユーティリティ ============== */
+function allKeys(o){ return typeof o==='object'&&o!==null?Object.entries(o).flatMap(([k,v])=> typeof v==='object'&&v!==null?Object.keys(v).map(s=>`${k}.${s}`):[k]):[]; }
+function getField(o,k){ if(k.includes('.')){ const[a,b]=k.split('.'); return o[a]?.[b]; } return o[k]; }
+function setField(o,k,v){ if(k.includes('.')){ const[a,b]=k.split('.'); o[a]=o[a]||{}; o[a][b]=v; } else o[k]=v; }
+function isFlag(o,cfg){ const val=getField(o,cfg.flag); return val==='あり' || val===true || val==='Yes'; }
+function toPrice(x){ if(typeof x==='string') return parseInt(x.replace(/[^0-9]/g,''))||0; return parseFloat(x)||0; }
+/* ============================================ */
+</script>
 </body>
 </html>
