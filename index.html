@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>S.L.O.T.H. – 製品比較ツール ⅩⅤ</title>
+  <title>S.L.O.T.H. – 製品比較ツール ⅩⅥ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
@@ -14,8 +14,7 @@
     .btn-secondary{background:#6b7280;color:#fff}.btn-secondary:hover{background:#4b5563}
     .btn-copy{background:#fbbf24;color:#fff}.btn-copy:hover{background:#f59e0b}
     .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
-    @keyframes fade{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
-    .ani{animation:fade .15s ease-out}
+    .btn-clear{background:#9ca3af;color:#fff;padding:0 0.6rem}.btn-clear:hover{background:#6b7280}
     ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#a8a8a8;border-radius:4px}
     a.price-link{color:#2563eb;font-weight:600;text-decoration:underline;font-size:0.85rem}
     input,select{outline:none}
@@ -25,6 +24,8 @@
     #loading{position:fixed;inset:0;background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;z-index:60;backdrop-filter:blur(2px);font-size:1.2rem;font-weight:700}
     @keyframes spin{to{transform:rotate(360deg)}}
     .spinner{width:32px;height:32px;border:4px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:.75rem}
+    @keyframes fade{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+    .ani{animation:fade .15s ease-out}
   </style>
 </head>
 <body class="antialiased text-gray-800 select-none">
@@ -32,8 +33,8 @@
 /***************************
  *  Version & Constants    *
  ***************************/
-const VERSION_NUM = 15;
-const roman = ['','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ','Ⅺ','Ⅻ','ⅩⅢ','ⅩⅣ','ⅩⅤ'];
+const VERSION_NUM = 16;
+const roman = ['','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ','Ⅺ','Ⅻ','ⅩⅢ','ⅩⅣ','ⅩⅤ','ⅩⅥ'];
 const VERSION = roman[VERSION_NUM] || VERSION_NUM;
 
 /* ===== サイズレンジ定義 ===== */
@@ -43,9 +44,9 @@ const sizeRangesRef = [{label:'~300L',min:0,max:300},{label:'301~500L',min:301,m
 
 /* ===== 各カテゴリ設定 ===== */
 const cfgs = {
-  tv : {file:'tv-data.json', key:'モデル名', flag:'展示品', flagLabel:'展示品', size:'サイズ(インチ)', price:'店舗価格', priceLabel:'価格', title:'テレビ比較', subtitle:'テレビを選択して比較', filters:['展示品','サイズ(インチ)'], sizeRanges:sizeRangesTV, sample:'4K・55インチ・予算10万円以内で映画に強い'},
+  tv : {file:'tv-data.json', key:'モデル名', flag:'展示品', flagLabel:'展示品', size:'サイズ(インチ)', price:'店舗価格', priceLabel:'価格', title:'テレビ比較', subtitle:'テレビを選択して比較', filters:['展示品','サイズ(インチ)'], sizeRanges:sizeRangesTV, sample:'4K・55インチ・ネット動画向け'},
   ac : {file:'ac-data.json', key:'型番',   flag:'ゼロエミ.有無', flagLabel:'ゼロエミ', size:'畳数',       price:'店舗価格', priceLabel:'価格', title:'エアコン比較', subtitle:'エアコンを選択して比較', filters:['メーカー','ゼロエミ.有無','畳数'], sizeRanges:sizeRangesAC, sample:'10畳・省エネ・暖房重視'},
-  ref: {file:'refrigerator-data.json', key:'型番', flag:'展示品有無', flagLabel:'展示品', size:'容量(L)',   price:'店舗価格', priceLabel:'価格', title:'冷蔵庫比較', subtitle:'冷蔵庫を選択して比較', filters:['メーカー','展示品有無','容量(L)'], sizeRanges:sizeRangesRef, sample:'400L以上・野菜室大きめ・静音'}
+  ref: {file:'refrigerator-data.json', key:'型番', flag:'展示品有無', flagLabel:'展示品', size:'容量(L)',   price:'店舗価格', priceLabel:'価格', title:'冷蔵庫比較', subtitle:'冷蔵庫を選択して比較', filters:['メーカー','展示品有無','容量(L)'], sizeRanges:sizeRangesRef, sample:'400L以上・野菜室が大きい'}
 };
 
 /* ===== アプリ状態 ===== */
@@ -66,6 +67,7 @@ addEventListener('DOMContentLoaded', () => {
   $('#sel-sort').addEventListener('change',render);
   $('#btn-add').addEventListener('click',()=>openEditor());
   $('#ai-btn').addEventListener('click',aiSuggest);
+  $('#ai-clear').addEventListener('click',clearAI);
 });
 
 /***************************
@@ -73,7 +75,8 @@ addEventListener('DOMContentLoaded', () => {
  ***************************/
 async function load(cat){
   Object.assign(S,{cat,sel:[],flt:{},edit:false,ai:{req:'',picks:[]}});
-  $('#chk-edit').checked=false;$('#btn-add').classList.add('hidden');$('#ai-result').innerHTML='';
+  $('#chk-edit').checked=false;$('#btn-add').classList.add('hidden');
+  clearAI();
   const cfg=cfgs[cat];
   $('#hdg-title').textContent=`${cfg.title} (${VERSION})`;
   $('#hdg-sub').textContent   = cfg.subtitle;
@@ -253,7 +256,6 @@ function openEditor(id){
 
 function persist(file,data){
   localStorage.setItem(file,JSON.stringify(data));
-  /* ↓従来のダウンロードを残したまま */
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download=file; a.style.display='none'; document.body.appendChild(a); a.click();
@@ -261,8 +263,7 @@ function persist(file,data){
 }
 
 /***************************
- *  AI おすすめ機能        *
- *  Model: gemini-2.5-flash-lite
+ *  AI おすすめ機能 (修正版)
  ***************************/
 async function aiSuggest(){
   const req=$('#ai-input').value.trim();
@@ -273,7 +274,7 @@ async function aiSuggest(){
 
   const cfg=cfgs[S.cat];
   /* プロンプト組立 */
-  const itemsText=S.data.slice(0,40).map(d=>`- ${d[cfg.key]} / 価格:${getField(d,cfg.price)??'不明'} / ${cfg.size}:${getField(d,cfg.size)??'不明'}`).join('\n');
+  const itemsText=S.data.slice(0,50).map(d=>`- ${d[cfg.key]} / 価格:${getField(d,cfg.price)??'不明'} / ${cfg.size}:${getField(d,cfg.size)??'不明'}`).join('\n');
   const prompt=`あなたは家電選びのプロです。次の要望「${req}」に合う${cfg.title.replace('比較','')}を最大３件まで選び、日本語で「id」「reason」を JSON 配列で出力してください。フォーマットは [{"id":"...","reason":"..."}] のみ。製品リスト:\n${itemsText}`;
 
   try{
@@ -282,18 +283,32 @@ async function aiSuggest(){
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
     });
     const js=await res.json();
-    const text=js.candidates?.[0]?.content?.parts?.[0]?.text||'[]';
-    const picks=JSON.parse(text);
+    const raw=js.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const picks=parseAIPicks(raw);
+    if(!picks.length) throw new Error('empty');
     S.ai.picks=picks.map(p=>p.id);
-    /* 表示 */
     const html=picks.map(p=>`<li class="mb-2"><strong>${p.id}</strong><br><span class="text-xs">${p.reason}</span></li>`).join('');
     $('#ai-result').innerHTML=`<h3 class="font-bold mb-2">AI 推奨結果</h3><ul class="text-sm">${html}</ul>`;
   }catch(e){
     console.error(e);
-    $('#ai-result').innerHTML='<p class="text-sm text-red-600">AI 呼び出しに失敗しました</p>';
+    $('#ai-result').innerHTML='<p class="text-sm text-red-600">AI 推奨結果を取得できませんでした</p>';
   }
   hideLoading();
-  renderList(); // ハイライト更新
+  renderList();
+}
+
+function parseAIPicks(text){
+  /* --- 1) JSON 部分を抜き出してパース --- */
+  try{
+    const jpart=text.slice(text.indexOf('['),text.lastIndexOf(']')+1);
+    return JSON.parse(jpart);
+  }catch{}
+  /* --- 2) 箇条書き fallback "--- id:理由" --- */
+  const lines=text.split('\n').filter(l=>l.trim().startsWith('-'));
+  return lines.map(l=>{
+    const m=l.replace(/^-+ */,'').split(/[:：]/);
+    return {id:m[0]?.trim()||'',reason:m.slice(1).join(':').trim()};
+  }).filter(p=>p.id);
 }
 
 function highlightAIPicks(){
@@ -301,7 +316,8 @@ function highlightAIPicks(){
 
   $$('#list .card-root').forEach(c=>{
     const id=c.dataset.id;
-    if(S.ai.picks.includes(getModelById(id))) c.classList.add('ai-pick'); else c.classList.remove('ai-pick');
+    const mdl=getModelById(id);
+    if(mdl && S.ai.picks.some(p=>p.toLowerCase()==mdl.toLowerCase())) c.classList.add('ai-pick'); else c.classList.remove('ai-pick');
   });
 }
 function getModelById(id){
@@ -321,6 +337,16 @@ function showLoading(msg='処理中…'){
 function hideLoading(){
   $('#loading')?.remove();
   $('#ai-btn').disabled=false;
+}
+
+/***************************
+ *  AI 入力クリア           *
+ ***************************/
+function clearAI(){
+  $('#ai-input').value='';
+  $('#ai-result').innerHTML='';
+  S.ai={req:'',picks:[]};
+  renderList();
 }
 
 /***************************
@@ -361,7 +387,10 @@ function toPrice(x){if(typeof x==='string')return parseInt(x.replace(/[^0-9]/g,'
     <h3 class="font-bold mb-2">AI におすすめを相談する</h3>
     <div class="flex flex-col sm:flex-row gap-2">
       <input id="ai-input" class="border rounded p-2 flex-grow text-sm" />
-      <button id="ai-btn" class="btn btn-primary sm:w-40">AI に聞く</button>
+      <div class="flex gap-2">
+        <button id="ai-btn" class="btn btn-primary sm:w-32">AI に聞く</button>
+        <button id="ai-clear" class="btn btn-clear sm:w-12">×</button>
+      </div>
     </div>
     <p id="ai-placeholder" class="text-xs text-gray-500 mt-1"></p>
     <div id="ai-result" class="mt-4"></div>
