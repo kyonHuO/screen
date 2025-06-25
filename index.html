@@ -1,4 +1,3 @@
-<!-- Mark ⅩⅣ -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -13,13 +12,15 @@
     .btn{border-radius:8px;font-weight:600;transition:.2s;padding:0.45rem 0.9rem;font-size:0.8rem}
     .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
     .btn-secondary{background:#6b7280;color:#fff}.btn-secondary:hover{background:#4b5563}
-    .btn-tertiary{background:#10b981;color:#fff}.btn-tertiary:hover{background:#059669}
+    .btn-copy{background:#fbbf24;color:#fff}.btn-copy:hover{background:#f59e0b}
     .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
     @keyframes fade{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
     .ani{animation:fade .15s ease-out}
     ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#a8a8a8;border-radius:4px}
     a.price-link{color:#2563eb;font-weight:600;text-decoration:underline;font-size:0.85rem}
     input,select{outline:none}
+    /* AI 推薦ハイライト */
+    .ai-pick{outline:4px solid #10b981;outline-offset:2px}
   </style>
 </head>
 <body class="antialiased text-gray-800 select-none">
@@ -44,7 +45,7 @@ const cfgs = {
 };
 
 /* ===== アプリ状態 ===== */
-const S = {cat:null, data:[], sel:[], flt:{}, edit:false};
+const S = {cat:null, data:[], sel:[], flt:{}, edit:false, ai:{req:'', picks:[]} };
 const $  = s=>document.querySelector(s);
 const $$ = s=>document.querySelectorAll(s);
 
@@ -54,22 +55,25 @@ const $$ = s=>document.querySelectorAll(s);
 addEventListener('DOMContentLoaded', () => {
   $('#verHeader').textContent = VERSION;
   $('#verLead').textContent   = VERSION;
+
   $$('.cat-btn').forEach(btn=>btn.addEventListener('click',()=>load(btn.dataset.cat)));
   $('#btn-back').addEventListener('click',()=>{$('#screen-select').classList.remove('hidden');$('#screen-app').classList.add('hidden');});
   $('#chk-edit').addEventListener('change',e=>{S.edit=e.target.checked;$('#btn-add').classList.toggle('hidden',!S.edit);render();});
   $('#sel-sort').addEventListener('change',render);
   $('#btn-add').addEventListener('click',()=>openEditor());
+  $('#ai-btn').addEventListener('click',aiSuggest);
 });
 
 /***************************
  *  データロード           *
  ***************************/
 async function load(cat){
-  Object.assign(S,{cat,sel:[],flt:{},edit:false});
-  $('#chk-edit').checked=false;$('#btn-add').classList.add('hidden');
+  Object.assign(S,{cat,sel:[],flt:{},edit:false,ai:{req:'',picks:[]}});
+  $('#chk-edit').checked=false;$('#btn-add').classList.add('hidden');$('#ai-result').innerHTML='';
   const cfg=cfgs[cat];
   $('#hdg-title').textContent=`${cfg.title} (${VERSION})`;
   $('#hdg-sub').textContent   = cfg.subtitle;
+  $('#ai-placeholder').textContent = 'ご要望を入力して AI におすすめを聞いてみましょう';
   $('#sortbox').classList.remove('hidden');
   let data=[];
   try{const res=await fetch(cfg.file);if(res.ok)data=await res.json();else throw new Error(res.status);}catch{const saved=localStorage.getItem(cfg.file);if(saved)data=JSON.parse(saved);}  
@@ -81,8 +85,9 @@ async function load(cat){
 /***************************
  *  描画                   *
  ***************************/
-function render(){renderFilters();renderList();renderCompare();}
+function render(){renderFilters();renderList();renderCompare();highlightAIPicks();}
 
+/* ---------- フィルタ ---------- */
 function renderFilters(){
   const cfg=cfgs[S.cat];
   const box=$('#filter');box.innerHTML='';
@@ -110,6 +115,7 @@ function fbtn(key,val,label){
   return b;
 }
 
+/* ---------- 一覧 ---------- */
 function renderList(){
   const cfg=cfgs[S.cat];
   let list=[...S.data];
@@ -131,21 +137,23 @@ function renderList(){
   /* 描画 */
   const wrap=$('#list');wrap.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6';
   wrap.innerHTML=list.map(d=>card(d,cfg)).join('');
+
   $$('#list .card-root').forEach(el=>el.addEventListener('click',e=>{if(!e.target.closest('button'))openDetail(list.find(x=>x.id===el.dataset.id),cfg);}));
 }
 
 function card(d,cfg){d.id=d.id||crypto.randomUUID();const sel=S.sel.includes(d.id);
   const priceVal=getField(d,cfg.price);
   const priceElem=S.cat==='tv'? (priceVal?`<a class='price-link'>${priceVal}</a>`:"<span class='text-xs text-blue-600'>価格情報なし</span>"):`<span class='text-xs'>${priceVal??'-'}</span>`;
-  const commonBtn=`<button class='btn btn-secondary' onclick='event.stopPropagation();window.open("https://www.google.com/search?q=${encodeURIComponent(d[cfg.key])}")'>🔍</button>
-                  <button class='btn btn-tertiary' onclick='event.stopPropagation();askGemini("${d[cfg.key]}")'>G</button>`;
+  const googleBtn=`<button class='btn btn-secondary' onclick='event.stopPropagation();window.open("https://www.google.com/search?q=${encodeURIComponent(d[cfg.key])}")'>🔍</button>`;
+  const copyBtn=`<button class='btn btn-copy' id='copy-${d.id}' onclick='event.stopPropagation();copyModel("${d.id}")'>📋</button>`;
   return `<div class='card p-4 flex flex-col gap-2 card-root' data-id='${d.id}'>
     <h4 class='font-semibold text-xs sm:text-sm mb-1'>${d[cfg.key]}</h4>
     ${priceElem}
     <div class='text-xs space-y-1'>${renderFieldLines(d,cfg).join('')}</div>
     <div class='mt-auto grid grid-cols-4 gap-1 text-xs'>
       <button class='btn btn-primary col-span-2' onclick='event.stopPropagation();toggleSel("${d.id}")'>${sel?'解除':'比較'}</button>
-      ${commonBtn}
+      ${googleBtn}
+      ${copyBtn}
       ${S.edit?`<button class='btn btn-danger w-full col-span-4 mt-1' onclick='event.stopPropagation();openEditor("${d.id}")'>編集</button>`:''}
     </div>
   </div>`;
@@ -154,6 +162,19 @@ function renderFieldLines(d,cfg){
   if(S.cat==='tv')  return ['サイズ','解像度','パネル','エンジン','特徴'].map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)??'-'}</p>`);
   if(S.cat==='ac')  return ['メーカー','畳数','冷房能力','暖房能力'].map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)??'-'}</p>`);
   return ['メーカー','容量','ドア数'].map(k=>`<p><span class='font-medium'>${k}:</span> ${getField(d,k)??'-'}</p>`);
+}
+
+/***************************
+ *  ワンタップ型番コピー    *
+ ***************************/
+function copyModel(id){
+  const cfg=cfgs[S.cat];
+  const item=S.data.find(d=>d.id===id);
+  if(!item) return;
+  navigator.clipboard.writeText(item[cfg.key]).then(()=>{
+    const btn=$(`#copy-${id}`); if(!btn) return;
+    btn.textContent='✔'; setTimeout(()=>btn.textContent='📋',1200);
+  });
 }
 
 /***************************
@@ -194,10 +215,9 @@ function openBig(ids){
  ***************************/
 function openEditor(id){
   const cfg=cfgs[S.cat];
-  const isNew=!id;   // 新規か更新か
+  const isNew=!id;
   const item=isNew?{id:crypto.randomUUID()}:structuredClone(S.data.find(d=>d.id===id));
   if(!item){alert('データが見つかりません');return;}
-  /* ---------- 編集フォーム生成 ---------- */
   const baseKeys=[cfg.key,cfg.price,cfg.size,cfg.flag,'メーカー'];
   const keys=[...new Set([...baseKeys,...allKeys(item)])];
   const boolSpec={展示品:['あり','なし'],展示品有無:['あり','なし'],'ゼロエミ.有無':['あり','なし']};
@@ -235,6 +255,54 @@ function persist(file,data){
 }
 
 /***************************
+ *  AI おすすめ機能        *
+ *  Model: gemini-2.5-flash-lite
+ ***************************/
+async function aiSuggest(){
+  const req=$('#ai-input').value.trim();
+  if(!req){alert('ご要望を入力してください');return;}
+  $('#ai-result').innerHTML='<p class="text-sm text-gray-500">AI が選定中…</p>';
+  S.ai.req=req; S.ai.picks=[];
+
+  const cfg=cfgs[S.cat];
+  /* プロンプト組立 */
+  const itemsText=S.data.slice(0,40).map(d=>`- ${d[cfg.key]} / 価格:${getField(d,cfg.price)??'不明'} / サイズ:${getField(d,cfg.size)??'不明'}`).join('\n');
+  const prompt=`あなたは家電選びのプロです。次の要望「${req}」に合う${cfg.title.replace('比較','')}を最大３件まで選び、日本語で「型番(orモデル名)」「おすすめ理由」を JSON 配列で出力してください。フォーマットは [{"id":"...","reason":"..."}] のみ。製品リスト:\n${itemsText}`;
+
+  try{
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=YOUR_API_KEY',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
+    });
+    const js=await res.json();
+    const text=js.candidates?.[0]?.content?.parts?.[0]?.text||'[]';
+    const picks=JSON.parse(text);
+    S.ai.picks=picks.map(p=>p.id);
+    /* 表示 */
+    const html=picks.map(p=>`<li class="mb-2"><strong>${p.id}</strong><br><span class="text-xs">${p.reason}</span></li>`).join('');
+    $('#ai-result').innerHTML=`<h3 class="font-bold mb-2">AI 推奨結果</h3><ul class="text-sm">${html}</ul>`;
+  }catch(e){
+    console.error(e);
+    $('#ai-result').innerHTML='<p class="text-sm text-red-600">AI 呼び出しに失敗しました</p>';
+  }
+  renderList(); // ハイライト更新
+}
+
+function highlightAIPicks(){
+  if(!S.ai.picks.length){$$('#list .card-root').forEach(c=>c.classList.remove('ai-pick'));return;}
+
+  $$('#list .card-root').forEach(c=>{
+    const id=c.dataset.id;
+    if(S.ai.picks.includes(getModelById(id))) c.classList.add('ai-pick'); else c.classList.remove('ai-pick');
+  });
+}
+function getModelById(id){
+  const cfg=cfgs[S.cat];
+  const item=S.data.find(d=>d.id===id);
+  return item?item[cfg.key]:null;
+}
+
+/***************************
  *  汎用モーダル & Utils   *
  ***************************/
 function modal(html){
@@ -246,7 +314,6 @@ function getField(o,k){if(k.includes('.')){const[a,b]=k.split('.');return o[a]?.
 function setField(o,k,v){if(k.includes('.')){const[a,b]=k.split('.');o[a]=o[a]||{};o[a][b]=v;}else o[k]=v;}
 function isFlag(o,cfg){const val=getField(o,cfg.flag);return val==='あり'||val===true||val==='Yes';}
 function toPrice(x){if(typeof x==='string')return parseInt(x.replace(/[^0-9]/g,''))||0;return parseFloat(x)||0;}
-function askGemini(q){window.open(`https://gemini.google.com/?q=${encodeURIComponent(q)}`,'_blank');}
 </script>
 
 <header class="py-4 text-center bg-white shadow fixed top-0 w-full z-40">
@@ -268,6 +335,17 @@ function askGemini(q){window.open(`https://gemini.google.com/?q=${encodeURICompo
 
 <!-- メイン画面 -->
 <div id="screen-app" class="hidden container mx-auto p-6 pt-32">
+  <!-- AI 入力欄 -->
+  <div class="card p-4 mb-6">
+    <h3 class="font-bold mb-2">AI におすすめを相談する</h3>
+    <div class="flex flex-col sm:flex-row gap-2">
+      <input id="ai-input" class="border rounded p-2 flex-grow text-sm" placeholder="例）4K・55インチ・予算10万円以内で映画に強いテレビ" />
+      <button id="ai-btn" class="btn btn-primary sm:w-40">AI に聞く</button>
+    </div>
+    <p id="ai-placeholder" class="text-xs text-gray-500 mt-1"></p>
+    <div id="ai-result" class="mt-4"></div>
+  </div>
+
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
     <div class="flex gap-2 items-center">
       <button id="btn-back" class="btn bg-gray-200 text-gray-700">&larr; 戻る</button>
