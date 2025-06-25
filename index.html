@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>S.L.O.T.H. – 製品比較ツール ⅩⅣ</title>
+  <title>S.L.O.T.H. – 製品比較ツール ⅩⅤ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body{font-family:'Noto Sans JP',sans-serif;background:#f8f9fa}
@@ -21,6 +21,10 @@
     input,select{outline:none}
     /* AI 推薦ハイライト */
     .ai-pick{outline:4px solid #10b981;outline-offset:2px}
+    /* ローディングオーバーレイ */
+    #loading{position:fixed;inset:0;background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;z-index:60;backdrop-filter:blur(2px);font-size:1.2rem;font-weight:700}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spinner{width:32px;height:32px;border:4px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:.75rem}
   </style>
 </head>
 <body class="antialiased text-gray-800 select-none">
@@ -28,8 +32,8 @@
 /***************************
  *  Version & Constants    *
  ***************************/
-const VERSION_NUM = 14;
-const roman = ['','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ','Ⅺ','Ⅻ','ⅩⅢ','ⅩⅣ'];
+const VERSION_NUM = 15;
+const roman = ['','Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ','Ⅸ','Ⅹ','Ⅺ','Ⅻ','ⅩⅢ','ⅩⅣ','ⅩⅤ'];
 const VERSION = roman[VERSION_NUM] || VERSION_NUM;
 
 /* ===== サイズレンジ定義 ===== */
@@ -39,9 +43,9 @@ const sizeRangesRef = [{label:'~300L',min:0,max:300},{label:'301~500L',min:301,m
 
 /* ===== 各カテゴリ設定 ===== */
 const cfgs = {
-  tv : {file:'tv-data.json', key:'モデル名', flag:'展示品', flagLabel:'展示品', size:'サイズ(インチ)', price:'店舗価格', priceLabel:'価格', title:'テレビ比較', subtitle:'テレビを選択して比較', filters:['展示品','サイズ(インチ)'], sizeRanges:sizeRangesTV},
-  ac : {file:'ac-data.json', key:'型番',   flag:'ゼロエミ.有無', flagLabel:'ゼロエミ', size:'畳数',       price:'店舗価格', priceLabel:'価格', title:'エアコン比較', subtitle:'エアコンを選択して比較', filters:['メーカー','ゼロエミ.有無','畳数'], sizeRanges:sizeRangesAC},
-  ref: {file:'refrigerator-data.json', key:'型番', flag:'展示品有無', flagLabel:'展示品', size:'容量(L)',   price:'店舗価格', priceLabel:'価格', title:'冷蔵庫比較', subtitle:'冷蔵庫を選択して比較', filters:['メーカー','展示品有無','容量(L)'], sizeRanges:sizeRangesRef}
+  tv : {file:'tv-data.json', key:'モデル名', flag:'展示品', flagLabel:'展示品', size:'サイズ(インチ)', price:'店舗価格', priceLabel:'価格', title:'テレビ比較', subtitle:'テレビを選択して比較', filters:['展示品','サイズ(インチ)'], sizeRanges:sizeRangesTV, sample:'4K・55インチ・予算10万円以内で映画に強い'},
+  ac : {file:'ac-data.json', key:'型番',   flag:'ゼロエミ.有無', flagLabel:'ゼロエミ', size:'畳数',       price:'店舗価格', priceLabel:'価格', title:'エアコン比較', subtitle:'エアコンを選択して比較', filters:['メーカー','ゼロエミ.有無','畳数'], sizeRanges:sizeRangesAC, sample:'10畳・省エネ・暖房重視'},
+  ref: {file:'refrigerator-data.json', key:'型番', flag:'展示品有無', flagLabel:'展示品', size:'容量(L)',   price:'店舗価格', priceLabel:'価格', title:'冷蔵庫比較', subtitle:'冷蔵庫を選択して比較', filters:['メーカー','展示品有無','容量(L)'], sizeRanges:sizeRangesRef, sample:'400L以上・野菜室大きめ・静音'}
 };
 
 /* ===== アプリ状態 ===== */
@@ -73,7 +77,8 @@ async function load(cat){
   const cfg=cfgs[cat];
   $('#hdg-title').textContent=`${cfg.title} (${VERSION})`;
   $('#hdg-sub').textContent   = cfg.subtitle;
-  $('#ai-placeholder').textContent = 'ご要望を入力して AI におすすめを聞いてみましょう';
+  $('#ai-placeholder').textContent = `例）${cfg.sample}`;
+  $('#ai-input').placeholder   = `例）${cfg.sample}`;
   $('#sortbox').classList.remove('hidden');
   let data=[];
   try{const res=await fetch(cfg.file);if(res.ok)data=await res.json();else throw new Error(res.status);}catch{const saved=localStorage.getItem(cfg.file);if(saved)data=JSON.parse(saved);}  
@@ -248,6 +253,7 @@ function openEditor(id){
 
 function persist(file,data){
   localStorage.setItem(file,JSON.stringify(data));
+  /* ↓従来のダウンロードを残したまま */
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download=file; a.style.display='none'; document.body.appendChild(a); a.click();
@@ -261,16 +267,17 @@ function persist(file,data){
 async function aiSuggest(){
   const req=$('#ai-input').value.trim();
   if(!req){alert('ご要望を入力してください');return;}
-  $('#ai-result').innerHTML='<p class="text-sm text-gray-500">AI が選定中…</p>';
   S.ai.req=req; S.ai.picks=[];
+  $('#ai-result').innerHTML='';
+  showLoading('回答生成中…');
 
   const cfg=cfgs[S.cat];
   /* プロンプト組立 */
-  const itemsText=S.data.slice(0,40).map(d=>`- ${d[cfg.key]} / 価格:${getField(d,cfg.price)??'不明'} / サイズ:${getField(d,cfg.size)??'不明'}`).join('\n');
-  const prompt=`あなたは家電選びのプロです。次の要望「${req}」に合う${cfg.title.replace('比較','')}を最大３件まで選び、日本語で「型番(orモデル名)」「おすすめ理由」を JSON 配列で出力してください。フォーマットは [{"id":"...","reason":"..."}] のみ。製品リスト:\n${itemsText}`;
+  const itemsText=S.data.slice(0,40).map(d=>`- ${d[cfg.key]} / 価格:${getField(d,cfg.price)??'不明'} / ${cfg.size}:${getField(d,cfg.size)??'不明'}`).join('\n');
+  const prompt=`あなたは家電選びのプロです。次の要望「${req}」に合う${cfg.title.replace('比較','')}を最大３件まで選び、日本語で「id」「reason」を JSON 配列で出力してください。フォーマットは [{"id":"...","reason":"..."}] のみ。製品リスト:\n${itemsText}`;
 
   try{
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=YOUR_API_KEY',{
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=AIzaSyDhOaoqnZA7POhqjpZuJCTCCW-GmJsrHWg',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})
     });
@@ -285,6 +292,7 @@ async function aiSuggest(){
     console.error(e);
     $('#ai-result').innerHTML='<p class="text-sm text-red-600">AI 呼び出しに失敗しました</p>';
   }
+  hideLoading();
   renderList(); // ハイライト更新
 }
 
@@ -300,6 +308,19 @@ function getModelById(id){
   const cfg=cfgs[S.cat];
   const item=S.data.find(d=>d.id===id);
   return item?item[cfg.key]:null;
+}
+
+/***************************
+ *  Loading Overlay        *
+ ***************************/
+function showLoading(msg='処理中…'){
+  const html=`<div id="loading"><div class="spinner"></div>${msg}</div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+  $('#ai-btn').disabled=true;
+}
+function hideLoading(){
+  $('#loading')?.remove();
+  $('#ai-btn').disabled=false;
 }
 
 /***************************
@@ -339,7 +360,7 @@ function toPrice(x){if(typeof x==='string')return parseInt(x.replace(/[^0-9]/g,'
   <div class="card p-4 mb-6">
     <h3 class="font-bold mb-2">AI におすすめを相談する</h3>
     <div class="flex flex-col sm:flex-row gap-2">
-      <input id="ai-input" class="border rounded p-2 flex-grow text-sm" placeholder="例）4K・55インチ・予算10万円以内で映画に強いテレビ" />
+      <input id="ai-input" class="border rounded p-2 flex-grow text-sm" />
       <button id="ai-btn" class="btn btn-primary sm:w-40">AI に聞く</button>
     </div>
     <p id="ai-placeholder" class="text-xs text-gray-500 mt-1"></p>
